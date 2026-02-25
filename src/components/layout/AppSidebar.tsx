@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FolderOpen, Plus, Trash2, Pencil, Check, X } from 'lucide-react';
+import { FolderOpen, Plus, Trash2, Pencil, Check, X, Archive } from 'lucide-react';
 import { Client } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,7 @@ interface AppSidebarProps {
   onAddClient: (name: string) => void;
   onRenameClient: (id: string, name: string) => void;
   onDeleteClient: (id: string) => void;
+  onShowArchive?: () => void;
 }
 
 export function AppSidebar({
@@ -21,6 +22,7 @@ export function AppSidebar({
   onAddClient,
   onRenameClient,
   onDeleteClient,
+  onShowArchive,
 }: AppSidebarProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [newName, setNewName] = useState('');
@@ -163,6 +165,21 @@ export function AppSidebar({
           )}
         </div>
       </div>
+
+      {/* Archive Button */}
+      {selectedClient && onShowArchive && (
+        <div className="px-3 pb-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onShowArchive}
+            className="w-full text-xs h-8 justify-start"
+          >
+            <Archive className="w-3.5 h-3.5 mr-2" />
+            View Archive
+          </Button>
+        </div>
+      )}
 
       {/* Footer */}
       <div className="p-4 border-t border-sidebar-border">

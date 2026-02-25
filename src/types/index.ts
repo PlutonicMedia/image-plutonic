@@ -1,8 +1,21 @@
+export interface ClientLastSettings {
+  aspectRatio?: string;
+  quality?: string;
+  numOutputs?: number;
+  format?: string;
+  cameraLens?: string;
+  selectedStyle?: StyleCategory | null;
+  styleSubOptions?: Record<string, string>;
+  promptMode?: 'predefined' | 'manual';
+  selectedJsonPromptId?: string | null;
+}
+
 export interface Client {
   id: string;
   name: string;
   created_at: string;
   user_id: string;
+  last_settings?: ClientLastSettings | null;
 }
 
 export interface BrandAsset {
@@ -76,7 +89,7 @@ export const STYLE_SUB_OPTIONS: Record<StyleCategory, { dropdowns: { label: stri
   studio: {
     dropdowns: [
       { label: 'Lighting Preset', key: 'lighting', options: ['Rembrandt', 'High Key', 'Rim Lighting', 'Softbox', 'Neutral White', 'High-Key Commercial', 'Soft Umbrella', 'Overcast Studio'] },
-      { label: 'Material Preset', key: 'material', options: ['Reflective Acrylic', 'Raw Concrete', 'Velvet Backdrop', 'Polished Marble', 'Matte Plastic', 'Brushed Aluminum', 'Light Grey Sandstone', 'Frosted Glass'] },
+      { label: 'Material Preset', key: 'material', options: ['Reflective Acrylic', 'Raw Concrete', 'Velvet Backdrop', 'Polished Marble', 'Matte Plastic', 'Brushed Aluminum', 'Light Grey Sandstone', 'Frosted Glass', 'Neutral White'] },
     ],
   },
   lifestyle: {

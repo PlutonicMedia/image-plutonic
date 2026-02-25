@@ -15,6 +15,7 @@ interface QueueInput {
   modelImage: string | null;
   clientId?: string;
   jsonPrompt?: PredefinedJsonPrompt | null;
+  onComplete?: (results: GeneratedImage[]) => void;
 }
 
 export function useGenerationQueue() {
@@ -84,6 +85,11 @@ export function useGenerationQueue() {
         // Toast notification on completion
         toast({ title: '✅ Generation complete', description: `${results.length} creative${results.length !== 1 ? 's' : ''} ready.` });
 
+        // Call onComplete callback
+        if ((task as any).onComplete && results.length > 0) {
+          (task as any).onComplete(results);
+        }
+
         if (results.length === 0) {
           updateTask(task.id, { status: 'error', error: 'No images generated' });
         }
@@ -103,7 +109,7 @@ export function useGenerationQueue() {
         return prev;
       }
 
-      const task: QueueTask & { jsonPrompt?: PredefinedJsonPrompt | null } = {
+      const task: QueueTask & { jsonPrompt?: PredefinedJsonPrompt | null; onComplete?: (results: GeneratedImage[]) => void } = {
         id: `q-${Date.now()}`,
         status: 'pending',
         prompt: input.prompt,
@@ -116,6 +122,7 @@ export function useGenerationQueue() {
         results: [],
         progress: 0,
         jsonPrompt: input.jsonPrompt,
+        onComplete: input.onComplete,
       };
 
       const newQueue = [...prev, task];

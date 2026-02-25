@@ -49,6 +49,7 @@ function getShadowReflectionMapping(hasProduct: boolean, material: string): stri
     'Brushed Aluminum': 'Render anisotropic reflections on the brushed aluminum surface. Directional specular highlights following the grain pattern of the metal.',
     'Light Grey Sandstone': 'Cast warm, textured shadows on the sandstone surface. Show micro-grain interaction and subtle surface irregularities at the contact point.',
     'Frosted Glass': 'Render diffused, frosted reflections on the glass surface beneath the product. Soft caustic light scatter with translucent depth effect.',
+    'Neutral White': 'Matte, non-reflective neutral white surface providing a clean and clinical commercial aesthetic. Render subtle contact shadows with soft ambient occlusion. No reflections — purely diffuse light interaction.',
   };
   const instruction = surfaceMap[material];
   if (instruction) return instruction;
