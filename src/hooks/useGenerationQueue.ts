@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { QueueTask, GeneratedImage, GenerationSettings, StyleCategory } from '@/types';
+import { QueueTask, GeneratedImage, GenerationSettings, StyleCategory, PredefinedJsonPrompt } from '@/types';
 import { compilePrompt, getStyleTag } from '@/lib/promptCompiler';
 import { useToast } from '@/hooks/use-toast';
 
@@ -14,6 +14,7 @@ interface QueueInput {
   productImage: string | null;
   modelImage: string | null;
   clientId?: string;
+  jsonPrompt?: PredefinedJsonPrompt | null;
 }
 
 export function useGenerationQueue() {
@@ -43,6 +44,7 @@ export function useGenerationQueue() {
         hasModelImage: !!task.modelImage,
         aspectRatio: task.settings.aspectRatio,
         cameraLens: task.settings.cameraLens,
+        jsonPrompt: (task as any).jsonPrompt || null,
       });
 
       const styleTag = getStyleTag(task.style, task.styleSubOptions);
@@ -79,6 +81,9 @@ export function useGenerationQueue() {
         await Promise.all(promises);
         updateTask(task.id, { status: 'done', progress: 100, results });
 
+        // Toast notification on completion
+        toast({ title: '✅ Generation complete', description: `${results.length} creative${results.length !== 1 ? 's' : ''} ready.` });
+
         if (results.length === 0) {
           updateTask(task.id, { status: 'error', error: 'No images generated' });
         }
@@ -88,7 +93,7 @@ export function useGenerationQueue() {
     }
 
     processingRef.current = false;
-  }, [updateTask]);
+  }, [updateTask, toast]);
 
   const enqueue = useCallback((input: QueueInput) => {
     setQueue((prev) => {
@@ -98,7 +103,7 @@ export function useGenerationQueue() {
         return prev;
       }
 
-      const task: QueueTask = {
+      const task: QueueTask & { jsonPrompt?: PredefinedJsonPrompt | null } = {
         id: `q-${Date.now()}`,
         status: 'pending',
         prompt: input.prompt,
@@ -110,6 +115,7 @@ export function useGenerationQueue() {
         clientId: input.clientId,
         results: [],
         progress: 0,
+        jsonPrompt: input.jsonPrompt,
       };
 
       const newQueue = [...prev, task];

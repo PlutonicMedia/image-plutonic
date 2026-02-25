@@ -1,4 +1,4 @@
-import { StyleCategory, GLOBAL_PROMPT_CONSTRAINT, NEGATIVE_PROMPT, CameraLens } from '@/types';
+import { StyleCategory, GLOBAL_PROMPT_CONSTRAINT, NEGATIVE_PROMPT, CameraLens, PredefinedJsonPrompt } from '@/types';
 
 interface CompilerInput {
   style: StyleCategory | null;
@@ -8,6 +8,7 @@ interface CompilerInput {
   hasModelImage: boolean;
   aspectRatio: string;
   cameraLens?: CameraLens | '';
+  jsonPrompt?: PredefinedJsonPrompt | null;
 }
 
 function getCameraInstruction(lens: CameraLens): string {
@@ -44,6 +45,10 @@ function getShadowReflectionMapping(hasProduct: boolean, material: string): stri
     'Light Oak': 'Render warm-toned shadows on the oak grain. Show subtle wood texture reflection under the product base.',
     'Dark Walnut': 'Cast deep, warm shadows on the walnut surface with semi-reflective grain highlights.',
     'Pine': 'Create natural soft shadows on the pine surface with visible grain interaction.',
+    'Matte Plastic': 'Render clean, even diffuse shadows on the matte plastic surface. Minimal reflections with subtle ambient occlusion at the contact point.',
+    'Brushed Aluminum': 'Render anisotropic reflections on the brushed aluminum surface. Directional specular highlights following the grain pattern of the metal.',
+    'Light Grey Sandstone': 'Cast warm, textured shadows on the sandstone surface. Show micro-grain interaction and subtle surface irregularities at the contact point.',
+    'Frosted Glass': 'Render diffused, frosted reflections on the glass surface beneath the product. Soft caustic light scatter with translucent depth effect.',
   };
   const instruction = surfaceMap[material];
   if (instruction) return instruction;
@@ -64,7 +69,6 @@ function getStylePrompt(style: StyleCategory, subs: Record<string, string>): str
   const palette = subs.palette || '';
   const lens = subs.lens || '';
   const texture = subs.texture || '';
-  const mood = subs.mood || '';
 
   switch (style) {
     case 'studio':
@@ -81,41 +85,67 @@ function getStylePrompt(style: StyleCategory, subs: Record<string, string>): str
       return `A Scandinavian minimalist composition with ${wood || 'natural wood'} tones and a ${palette || 'muted'} color palette. Clean lines, generous negative space, and soft diffused Nordic light. Every element serves a purpose in the frame.`;
     case 'luxury':
       return `An opulent luxury setting shot with a ${lens || 'professional'} lens. ${texture || 'Premium'} textures dominate the frame with shallow depth-of-field. Rich tonal range with deep shadows and luminous highlights evoking exclusivity.`;
-    case 'sexy':
-      return `An alluring composition with ${mood || 'dramatic'} atmosphere. ${texture || 'Luxurious'} textures catch the light creating sensual interplay of highlight and shadow. Warm color grading with selective focus for an intimate feel.`;
     default:
       return '';
   }
 }
 
+/** Compile a predefined JSON prompt into a full prompt string */
+function compileJsonPrompt(jp: PredefinedJsonPrompt, hasProduct: boolean, hasModel: boolean): string {
+  const parts: string[] = [];
+  parts.push(jp.scene.environment);
+  parts.push(jp.scene.lighting);
+  parts.push(jp.scene.camera);
+  parts.push(jp.scene.composition);
+
+  // Conditional subject logic
+  if (hasProduct && hasModel) {
+    parts.push(jp.scene.subjectWithBoth);
+  } else if (hasProduct) {
+    parts.push(jp.scene.subjectWithProduct);
+  } else if (hasModel) {
+    parts.push(jp.scene.subjectWithModel);
+  } else {
+    parts.push(jp.scene.subjectDefault);
+  }
+
+  parts.push(jp.scene.postProcessing);
+  return parts.join(' ');
+}
+
 export function compilePrompt(input: CompilerInput): string {
   const parts: string[] = [];
 
-  // Style-specific rich description
-  if (input.style) {
-    parts.push(getStylePrompt(input.style, input.subOptions));
-  }
+  // If a predefined JSON prompt is selected, use it as the primary source
+  if (input.jsonPrompt) {
+    parts.push(compileJsonPrompt(input.jsonPrompt, input.hasProductImage, input.hasModelImage));
+  } else {
+    // Style-specific rich description
+    if (input.style) {
+      parts.push(getStylePrompt(input.style, input.subOptions));
+    }
 
-  // Camera lens instruction
-  if (input.cameraLens) {
-    parts.push(getCameraInstruction(input.cameraLens));
-  }
+    // Camera lens instruction
+    if (input.cameraLens) {
+      parts.push(getCameraInstruction(input.cameraLens));
+    }
 
-  // Custom prompt / user override
-  if (input.customPrompt.trim()) {
-    parts.push(input.customPrompt.trim());
-  }
+    // Custom prompt / user override
+    if (input.customPrompt.trim()) {
+      parts.push(input.customPrompt.trim());
+    }
 
-  // Context-aware image injection
-  const contextInjection = getContextInjection(input.hasProductImage, input.hasModelImage);
-  if (contextInjection) {
-    parts.push(contextInjection);
-  }
+    // Context-aware image injection
+    const contextInjection = getContextInjection(input.hasProductImage, input.hasModelImage);
+    if (contextInjection) {
+      parts.push(contextInjection);
+    }
 
-  // Shadow & reflection mapping for product images
-  if (input.hasProductImage) {
-    const material = input.subOptions.material || input.subOptions.wood || '';
-    parts.push(getShadowReflectionMapping(true, material));
+    // Shadow & reflection mapping for product images
+    if (input.hasProductImage) {
+      const material = input.subOptions.material || input.subOptions.wood || '';
+      parts.push(getShadowReflectionMapping(true, material));
+    }
   }
 
   // Aspect ratio hint

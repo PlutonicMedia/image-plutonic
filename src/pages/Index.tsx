@@ -9,7 +9,7 @@ import { LoadingOverlay } from '@/components/generator/LoadingOverlay';
 import { QueueManager } from '@/components/generator/QueueManager';
 import { AdPlacementPreviewer } from '@/components/generator/AdPlacementPreviewer';
 import { useGenerationQueue } from '@/hooks/useGenerationQueue';
-import { Client, GeneratedImage, GenerationSettings, StyleCategory } from '@/types';
+import { Client, GeneratedImage, GenerationSettings, StyleCategory, PredefinedJsonPrompt } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Index() {
@@ -31,6 +31,8 @@ export default function Index() {
 
   const [selectedStyle, setSelectedStyle] = useState<StyleCategory | null>(null);
   const [styleSubOptions, setStyleSubOptions] = useState<Record<string, string>>({});
+  const [selectedJsonPrompt, setSelectedJsonPrompt] = useState<PredefinedJsonPrompt | null>(null);
+  const [promptMode, setPromptMode] = useState<'predefined' | 'manual'>('manual');
 
   const [lightboxImage, setLightboxImage] = useState<GeneratedImage | null>(null);
   const [adPreviewImage, setAdPreviewImage] = useState<GeneratedImage | null>(null);
@@ -84,29 +86,25 @@ export default function Index() {
   };
 
   const handleGenerate = useCallback(() => {
-    if (!prompt.trim()) return;
+    const hasContent = promptMode === 'predefined' ? !!selectedJsonPrompt : !!prompt.trim();
+    if (!hasContent) return;
     setShowLoadingOverlay(true);
     enqueue({
-      prompt,
+      prompt: promptMode === 'manual' ? prompt : '',
       settings,
       style: selectedStyle,
       styleSubOptions,
       productImage,
       modelImage,
       clientId: selectedClient?.id,
+      jsonPrompt: promptMode === 'predefined' ? selectedJsonPrompt : null,
     });
     toast({ title: 'Added to queue', description: 'Your generation task has been queued.' });
-  }, [prompt, settings, selectedStyle, styleSubOptions, productImage, modelImage, selectedClient, enqueue, toast]);
+  }, [prompt, settings, selectedStyle, styleSubOptions, productImage, modelImage, selectedClient, enqueue, toast, promptMode, selectedJsonPrompt]);
 
   const handleRefinedImage = useCallback((newImage: GeneratedImage) => {
     setAllResults((prev) => [...prev, newImage]);
   }, [setAllResults]);
-
-  const handleCreateVariants = (image: GeneratedImage) => {
-    setLightboxImage(null);
-    setProductImage(image.url);
-    setPrompt(`Create a variant of this creative. ${image.prompt}`);
-  };
 
   const handleDownload = async (image: GeneratedImage) => {
     const link = document.createElement('a');
@@ -155,6 +153,8 @@ export default function Index() {
           selectedStyle={selectedStyle} onStyleChange={setSelectedStyle}
           styleSubOptions={styleSubOptions} onStyleSubOptionsChange={setStyleSubOptions}
           queueCount={queue.filter((t) => t.status === 'pending' || t.status === 'running').length}
+          selectedJsonPrompt={selectedJsonPrompt} onJsonPromptChange={setSelectedJsonPrompt}
+          promptMode={promptMode} onPromptModeChange={setPromptMode}
         />
         <GalleryGrid
           images={allResults}
@@ -170,8 +170,9 @@ export default function Index() {
       {lightboxImage && (
         <Lightbox
           image={lightboxImage}
+          allImages={allResults}
           onClose={() => setLightboxImage(null)}
-          onCreateVariants={handleCreateVariants}
+          onNavigate={setLightboxImage}
           onDownload={handleDownload}
           onPreviewAd={setAdPreviewImage}
         />

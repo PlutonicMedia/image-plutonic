@@ -1,17 +1,31 @@
-import { X, Download, Sparkles, Monitor } from 'lucide-react';
+import { X, Download, Monitor, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { GeneratedImage } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface LightboxProps {
   image: GeneratedImage;
+  allImages: GeneratedImage[];
   onClose: () => void;
-  onCreateVariants: (image: GeneratedImage) => void;
+  onNavigate: (image: GeneratedImage) => void;
   onDownload: (image: GeneratedImage) => void;
   onPreviewAd?: (image: GeneratedImage) => void;
 }
 
-export function Lightbox({ image, onClose, onCreateVariants, onDownload, onPreviewAd }: LightboxProps) {
+export function Lightbox({ image, allImages, onClose, onNavigate, onDownload, onPreviewAd }: LightboxProps) {
+  const currentIndex = allImages.findIndex((i) => i.id === image.id);
+  const hasPrev = currentIndex > 0;
+  const hasNext = currentIndex < allImages.length - 1;
+
+  const goPrev = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (hasPrev) onNavigate(allImages[currentIndex - 1]);
+  };
+  const goNext = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (hasNext) onNavigate(allImages[currentIndex + 1]);
+  };
+
   return (
     <AnimatePresence>
       <motion.div
@@ -21,6 +35,26 @@ export function Lightbox({ image, onClose, onCreateVariants, onDownload, onPrevi
         className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/60 backdrop-blur-sm"
         onClick={onClose}
       >
+        {/* Left arrow */}
+        {hasPrev && (
+          <button
+            onClick={goPrev}
+            className="absolute left-4 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full bg-card/80 backdrop-blur-sm hover:bg-card transition-colors shadow-lg"
+          >
+            <ChevronLeft className="w-6 h-6" />
+          </button>
+        )}
+
+        {/* Right arrow */}
+        {hasNext && (
+          <button
+            onClick={goNext}
+            className="absolute right-4 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full bg-card/80 backdrop-blur-sm hover:bg-card transition-colors shadow-lg"
+          >
+            <ChevronRight className="w-6 h-6" />
+          </button>
+        )}
+
         <motion.div
           initial={{ scale: 0.95, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -33,7 +67,7 @@ export function Lightbox({ image, onClose, onCreateVariants, onDownload, onPrevi
             <div className="flex-1 min-w-0">
               <p className="text-sm text-muted-foreground truncate">{image.prompt}</p>
               <p className="text-xs text-muted-foreground/60 mt-0.5">
-                {image.aspect_ratio} · {new Date(image.created_at).toLocaleString()}
+                {image.aspect_ratio} · {currentIndex + 1}/{allImages.length} · {new Date(image.created_at).toLocaleString()}
               </p>
             </div>
             <button onClick={onClose} className="p-2 rounded-lg hover:bg-muted transition-colors ml-4">
@@ -49,10 +83,6 @@ export function Lightbox({ image, onClose, onCreateVariants, onDownload, onPrevi
             <Button onClick={() => onDownload(image)} variant="outline" size="sm" className="text-xs">
               <Download className="w-3.5 h-3.5 mr-1.5" />
               Download
-            </Button>
-            <Button onClick={() => onCreateVariants(image)} size="sm" className="text-xs">
-              <Sparkles className="w-3.5 h-3.5 mr-1.5" />
-              Create More Variants
             </Button>
             {onPreviewAd && (
               <Button onClick={() => onPreviewAd(image)} variant="outline" size="sm" className="text-xs">

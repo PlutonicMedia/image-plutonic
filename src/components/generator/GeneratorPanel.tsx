@@ -1,14 +1,14 @@
 import { useState, useRef } from 'react';
-import { Upload, X, Image, Sparkles, Settings2, Pencil, Camera } from 'lucide-react';
+import { Upload, X, Image, Sparkles, Settings2, Camera, FileJson, PenLine, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
-import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import {
-  Client, GenerationSettings, PREDEFINED_PROMPTS, ASPECT_RATIOS,
+  Client, GenerationSettings, ASPECT_RATIOS,
   StyleCategory, STYLE_CATEGORIES, STYLE_SUB_OPTIONS, CAMERA_LENSES, CameraLens,
+  PredefinedJsonPrompt, PREDEFINED_JSON_PROMPTS,
 } from '@/types';
 
 interface GeneratorPanelProps {
@@ -28,6 +28,10 @@ interface GeneratorPanelProps {
   styleSubOptions: Record<string, string>;
   onStyleSubOptionsChange: (opts: Record<string, string>) => void;
   queueCount?: number;
+  selectedJsonPrompt: PredefinedJsonPrompt | null;
+  onJsonPromptChange: (jp: PredefinedJsonPrompt | null) => void;
+  promptMode: 'predefined' | 'manual';
+  onPromptModeChange: (mode: 'predefined' | 'manual') => void;
 }
 
 function ImageUploadZone({ label, image, onChange }: { label: string; image: string | null; onChange: (img: string | null) => void }) {
@@ -73,21 +77,20 @@ export function GeneratorPanel({
   selectedStyle, onStyleChange,
   styleSubOptions, onStyleSubOptionsChange,
   queueCount = 0,
+  selectedJsonPrompt, onJsonPromptChange,
+  promptMode, onPromptModeChange,
 }: GeneratorPanelProps) {
-  const [isPredefined, setIsPredefined] = useState(false);
-  const [customizeOverride, setCustomizeOverride] = useState(false);
+  const [queued, setQueued] = useState(false);
 
-  const handlePromptSelect = (templateId: string) => {
-    const template = PREDEFINED_PROMPTS.find((p) => p.id === templateId);
-    if (template) {
-      onPromptChange(template.content);
-      setIsPredefined(true);
-      setCustomizeOverride(false);
-    }
+  const currentSubs = selectedStyle ? STYLE_SUB_OPTIONS[selectedStyle] : null;
+
+  const handleGenerate = () => {
+    onGenerate();
+    setQueued(true);
+    setTimeout(() => setQueued(false), 1500);
   };
 
-  const isPromptReadOnly = isPredefined && !customizeOverride;
-  const currentSubs = selectedStyle ? STYLE_SUB_OPTIONS[selectedStyle] : null;
+  const canGenerate = promptMode === 'predefined' ? !!selectedJsonPrompt : !!prompt.trim();
 
   return (
     <div className="generator-panel scrollbar-thin">
@@ -177,32 +180,66 @@ export function GeneratorPanel({
           )}
         </div>
 
-        {/* Prompt */}
+        {/* Prompt Mode Toggle */}
         <div className="space-y-2">
-          <Label className="text-xs font-medium text-muted-foreground">Predefined Prompts</Label>
-          <Select onValueChange={handlePromptSelect}>
-            <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Choose a template..." /></SelectTrigger>
-            <SelectContent>
-              {PREDEFINED_PROMPTS.map((p) => (
-                <SelectItem key={p.id} value={p.id} className="text-sm">{p.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {isPredefined && (
-            <div className="flex items-center gap-2">
-              <Switch checked={customizeOverride} onCheckedChange={setCustomizeOverride} id="customize-toggle" />
-              <Label htmlFor="customize-toggle" className="text-xs text-muted-foreground flex items-center gap-1 cursor-pointer">
-                <Pencil className="w-3 h-3" /> Customize
-              </Label>
+          <Label className="text-xs font-medium text-muted-foreground">Prompt Mode</Label>
+          <div className="flex gap-1.5">
+            <button
+              onClick={() => onPromptModeChange('predefined')}
+              className={`flex-1 py-2 px-3 rounded-md text-xs font-medium transition-all flex items-center justify-center gap-1.5 ${
+                promptMode === 'predefined'
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'bg-muted text-muted-foreground hover:bg-accent'
+              }`}
+            >
+              <FileJson className="w-3.5 h-3.5" />
+              Predefined
+            </button>
+            <button
+              onClick={() => onPromptModeChange('manual')}
+              className={`flex-1 py-2 px-3 rounded-md text-xs font-medium transition-all flex items-center justify-center gap-1.5 ${
+                promptMode === 'manual'
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'bg-muted text-muted-foreground hover:bg-accent'
+              }`}
+            >
+              <PenLine className="w-3.5 h-3.5" />
+              Manual
+            </button>
+          </div>
+
+          {promptMode === 'predefined' ? (
+            <div className="space-y-2">
+              <Select
+                value={selectedJsonPrompt?.id || ''}
+                onValueChange={(v) => {
+                  const jp = PREDEFINED_JSON_PROMPTS.find((p) => p.id === v) || null;
+                  onJsonPromptChange(jp);
+                }}
+              >
+                <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Choose a predefined prompt..." /></SelectTrigger>
+                <SelectContent>
+                  {PREDEFINED_JSON_PROMPTS.map((p) => (
+                    <SelectItem key={p.id} value={p.id} className="text-sm">{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedJsonPrompt && (
+                <div className="p-3 rounded-lg bg-muted/50 border border-border text-xs text-muted-foreground space-y-1.5">
+                  <p className="font-medium text-foreground text-[11px]">{selectedJsonPrompt.name}</p>
+                  <p className="leading-relaxed line-clamp-4">{selectedJsonPrompt.scene.environment}</p>
+                  <p className="text-[10px] text-muted-foreground/60 italic">This prompt auto-adapts based on uploaded images</p>
+                </div>
+              )}
             </div>
+          ) : (
+            <Textarea
+              value={prompt}
+              onChange={(e) => onPromptChange(e.target.value)}
+              placeholder="Describe your creative vision..."
+              className="min-h-[90px] text-sm resize-none"
+            />
           )}
-          <Textarea
-            value={prompt}
-            onChange={(e) => onPromptChange(e.target.value)}
-            placeholder="Describe your creative vision..."
-            className="min-h-[90px] text-sm resize-none"
-            readOnly={isPromptReadOnly}
-          />
         </div>
 
         {/* Output Settings */}
@@ -262,11 +299,16 @@ export function GeneratorPanel({
         </div>
 
         {/* Generate Button */}
-        <Button onClick={onGenerate} disabled={isGenerating || !prompt.trim()} className="w-full h-11 font-display font-semibold text-sm shadow-soft" size="lg">
-          {isGenerating ? (
+        <Button
+          onClick={handleGenerate}
+          disabled={!canGenerate}
+          className="w-full h-11 font-display font-semibold text-sm shadow-soft"
+          size="lg"
+        >
+          {queued ? (
             <span className="flex items-center gap-2">
-              <span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
-              Generating...
+              <Check className="w-4 h-4" />
+              Queued!
             </span>
           ) : (
             <span className="flex items-center gap-2">
