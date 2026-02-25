@@ -1,4 +1,4 @@
-import { X, Download, Copy, Sparkles } from 'lucide-react';
+import { X, Download, Sparkles, Monitor } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { GeneratedImage } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -8,9 +8,10 @@ interface LightboxProps {
   onClose: () => void;
   onCreateVariants: (image: GeneratedImage) => void;
   onDownload: (image: GeneratedImage) => void;
+  onPreviewAd?: (image: GeneratedImage) => void;
 }
 
-export function Lightbox({ image, onClose, onCreateVariants, onDownload }: LightboxProps) {
+export function Lightbox({ image, onClose, onCreateVariants, onDownload, onPreviewAd }: LightboxProps) {
   return (
     <AnimatePresence>
       <motion.div
@@ -28,7 +29,6 @@ export function Lightbox({ image, onClose, onCreateVariants, onDownload }: Light
           className="relative max-w-5xl max-h-[90vh] w-full mx-6 bg-card rounded-xl shadow-elevated overflow-hidden flex flex-col"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-border">
             <div className="flex-1 min-w-0">
               <p className="text-sm text-muted-foreground truncate">{image.prompt}</p>
@@ -36,24 +36,15 @@ export function Lightbox({ image, onClose, onCreateVariants, onDownload }: Light
                 {image.aspect_ratio} · {new Date(image.created_at).toLocaleString()}
               </p>
             </div>
-            <button
-              onClick={onClose}
-              className="p-2 rounded-lg hover:bg-muted transition-colors ml-4"
-            >
+            <button onClick={onClose} className="p-2 rounded-lg hover:bg-muted transition-colors ml-4">
               <X className="w-4 h-4" />
             </button>
           </div>
 
-          {/* Image */}
           <div className="flex-1 overflow-auto p-6 flex items-center justify-center bg-surface-sunken">
-            <img
-              src={image.url}
-              alt={image.prompt}
-              className="max-w-full max-h-[60vh] object-contain rounded-lg shadow-card"
-            />
+            <img src={image.url} alt={image.prompt} className="max-w-full max-h-[60vh] object-contain rounded-lg shadow-card" />
           </div>
 
-          {/* Actions */}
           <div className="flex items-center gap-2 p-4 border-t border-border">
             <Button onClick={() => onDownload(image)} variant="outline" size="sm" className="text-xs">
               <Download className="w-3.5 h-3.5 mr-1.5" />
@@ -63,6 +54,12 @@ export function Lightbox({ image, onClose, onCreateVariants, onDownload }: Light
               <Sparkles className="w-3.5 h-3.5 mr-1.5" />
               Create More Variants
             </Button>
+            {onPreviewAd && (
+              <Button onClick={() => onPreviewAd(image)} variant="outline" size="sm" className="text-xs">
+                <Monitor className="w-3.5 h-3.5 mr-1.5" />
+                Preview Ad
+              </Button>
+            )}
           </div>
         </motion.div>
       </motion.div>

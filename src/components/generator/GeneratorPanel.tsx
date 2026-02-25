@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Upload, X, Image, Sparkles, Settings2, Pencil } from 'lucide-react';
+import { Upload, X, Image, Sparkles, Settings2, Pencil, Camera } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import {
   Client, GenerationSettings, PREDEFINED_PROMPTS, ASPECT_RATIOS,
-  StyleCategory, STYLE_CATEGORIES, STYLE_SUB_OPTIONS,
+  StyleCategory, STYLE_CATEGORIES, STYLE_SUB_OPTIONS, CAMERA_LENSES, CameraLens,
 } from '@/types';
 
 interface GeneratorPanelProps {
@@ -27,6 +27,7 @@ interface GeneratorPanelProps {
   onStyleChange: (style: StyleCategory | null) => void;
   styleSubOptions: Record<string, string>;
   onStyleSubOptionsChange: (opts: Record<string, string>) => void;
+  queueCount?: number;
 }
 
 function ImageUploadZone({ label, image, onChange }: { label: string; image: string | null; onChange: (img: string | null) => void }) {
@@ -71,6 +72,7 @@ export function GeneratorPanel({
   onGenerate, isGenerating,
   selectedStyle, onStyleChange,
   styleSubOptions, onStyleSubOptionsChange,
+  queueCount = 0,
 }: GeneratorPanelProps) {
   const [isPredefined, setIsPredefined] = useState(false);
   const [customizeOverride, setCustomizeOverride] = useState(false);
@@ -85,7 +87,6 @@ export function GeneratorPanel({
   };
 
   const isPromptReadOnly = isPredefined && !customizeOverride;
-
   const currentSubs = selectedStyle ? STYLE_SUB_OPTIONS[selectedStyle] : null;
 
   return (
@@ -114,7 +115,6 @@ export function GeneratorPanel({
             <ImageUploadZone label="Product Image" image={productImage} onChange={onProductImageChange} />
             <ImageUploadZone label="Model Image" image={modelImage} onChange={onModelImageChange} />
           </div>
-          {/* Context badges */}
           {(productImage || modelImage) && (
             <div className="flex flex-wrap gap-1.5">
               {productImage && <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">Product detected</span>}
@@ -127,26 +127,20 @@ export function GeneratorPanel({
         <div className="space-y-2">
           <Label className="text-xs font-medium text-muted-foreground">Style Category</Label>
           <Select value={selectedStyle || ''} onValueChange={(v) => { onStyleChange(v as StyleCategory); onStyleSubOptionsChange({}); }}>
-            <SelectTrigger className="h-9 text-sm">
-              <SelectValue placeholder="Choose a style..." />
-            </SelectTrigger>
+            <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Choose a style..." /></SelectTrigger>
             <SelectContent>
               {STYLE_CATEGORIES.map((s) => (
                 <SelectItem key={s.value} value={s.value} className="text-sm">{s.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
-
-          {/* Sub-dropdowns */}
           {currentSubs && (
             <div className="grid grid-cols-2 gap-2 pt-1">
               {currentSubs.dropdowns.map((dd) => (
                 <div key={dd.key}>
                   <Label className="text-[10px] text-muted-foreground mb-1 block">{dd.label}</Label>
                   <Select value={styleSubOptions[dd.key] || ''} onValueChange={(v) => onStyleSubOptionsChange({ ...styleSubOptions, [dd.key]: v })}>
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue placeholder="Select..." />
-                    </SelectTrigger>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select..." /></SelectTrigger>
                     <SelectContent>
                       {dd.options.map((o) => (
                         <SelectItem key={o} value={o} className="text-xs">{o}</SelectItem>
@@ -159,20 +153,41 @@ export function GeneratorPanel({
           )}
         </div>
 
+        {/* Virtual Lens Library */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+            <Camera className="w-3.5 h-3.5" />
+            Camera Settings
+          </div>
+          <Select value={settings.cameraLens} onValueChange={(v) => onSettingsChange({ ...settings, cameraLens: v as CameraLens | '' })}>
+            <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="No lens preference" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none" className="text-sm">No lens preference</SelectItem>
+              {CAMERA_LENSES.map((l) => (
+                <SelectItem key={l.value} value={l.value} className="text-sm">
+                  {l.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {settings.cameraLens && (
+            <p className="text-[10px] text-muted-foreground leading-relaxed">
+              {CAMERA_LENSES.find((l) => l.value === settings.cameraLens)?.description}
+            </p>
+          )}
+        </div>
+
         {/* Prompt */}
         <div className="space-y-2">
           <Label className="text-xs font-medium text-muted-foreground">Predefined Prompts</Label>
           <Select onValueChange={handlePromptSelect}>
-            <SelectTrigger className="h-9 text-sm">
-              <SelectValue placeholder="Choose a template..." />
-            </SelectTrigger>
+            <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Choose a template..." /></SelectTrigger>
             <SelectContent>
               {PREDEFINED_PROMPTS.map((p) => (
                 <SelectItem key={p.id} value={p.id} className="text-sm">{p.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
-
           {isPredefined && (
             <div className="flex items-center gap-2">
               <Switch checked={customizeOverride} onCheckedChange={setCustomizeOverride} id="customize-toggle" />
@@ -181,10 +196,9 @@ export function GeneratorPanel({
               </Label>
             </div>
           )}
-
           <Textarea
             value={prompt}
-            onChange={(e) => { onPromptChange(e.target.value); if (isPredefined && customizeOverride) { /* allow editing */ } }}
+            onChange={(e) => onPromptChange(e.target.value)}
             placeholder="Describe your creative vision..."
             className="min-h-[90px] text-sm resize-none"
             readOnly={isPromptReadOnly}
@@ -197,7 +211,6 @@ export function GeneratorPanel({
             <Settings2 className="w-3.5 h-3.5" />
             Output Settings
           </div>
-
           <div>
             <Label className="text-xs text-muted-foreground mb-1.5 block">Aspect Ratio</Label>
             <div className="flex gap-1.5">
@@ -216,7 +229,6 @@ export function GeneratorPanel({
               ))}
             </div>
           </div>
-
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-xs text-muted-foreground mb-1.5 block">Quality</Label>
@@ -240,7 +252,6 @@ export function GeneratorPanel({
               </Select>
             </div>
           </div>
-
           <div>
             <div className="flex justify-between mb-1.5">
               <Label className="text-xs text-muted-foreground">Number of Outputs</Label>
@@ -260,7 +271,7 @@ export function GeneratorPanel({
           ) : (
             <span className="flex items-center gap-2">
               <Sparkles className="w-4 h-4" />
-              Generate {settings.numOutputs} Creative{settings.numOutputs > 1 ? 's' : ''}
+              {queueCount > 0 ? `Queue (${queueCount}/5)` : `Generate ${settings.numOutputs} Creative${settings.numOutputs > 1 ? 's' : ''}`}
             </span>
           )}
         </Button>

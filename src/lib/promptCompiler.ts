@@ -1,4 +1,4 @@
-import { StyleCategory, GLOBAL_PROMPT_CONSTRAINT } from '@/types';
+import { StyleCategory, GLOBAL_PROMPT_CONSTRAINT, NEGATIVE_PROMPT, CameraLens } from '@/types';
 
 interface CompilerInput {
   style: StyleCategory | null;
@@ -7,11 +7,23 @@ interface CompilerInput {
   hasProductImage: boolean;
   hasModelImage: boolean;
   aspectRatio: string;
+  cameraLens?: CameraLens | '';
+}
+
+function getCameraInstruction(lens: CameraLens): string {
+  switch (lens) {
+    case '85mm':
+      return 'Shot on 85mm f/1.8 lens: shallow depth of field, creamy bokeh background, razor-sharp subject focus, compressed perspective ideal for portrait and product isolation.';
+    case '24mm':
+      return 'Shot on 24mm wide-angle lens: expansive field of view, deep depth of field keeping foreground and background sharp, slight barrel perspective ideal for environmental and architectural scenes.';
+    case '35mm':
+      return 'Shot on 35mm standard lens: cinematic natural-eye perspective, balanced depth of field, no visible distortion, organic and immersive framing.';
+  }
 }
 
 function getContextInjection(hasProduct: boolean, hasModel: boolean): string {
   if (hasProduct && hasModel) {
-    return 'Create a natural interaction where the uploaded model is holding or interacting with the uploaded product in a realistic manner.';
+    return 'Create a natural interaction where the uploaded model is holding or interacting with the uploaded product in a realistic manner. Maintain facial features and product branding exactly.';
   }
   if (hasProduct) {
     return 'Incorporate the specific uploaded product image into the scene. Maintain the exact label details, shape, and branding of the product without alteration.';
@@ -20,6 +32,22 @@ function getContextInjection(hasProduct: boolean, hasModel: boolean): string {
     return 'Feature the specific uploaded model person as the central subject. Maintain their facial features, hair, and physique exactly as shown in the reference.';
   }
   return '';
+}
+
+function getShadowReflectionMapping(hasProduct: boolean, material: string): string {
+  if (!hasProduct) return '';
+  const surfaceMap: Record<string, string> = {
+    'Reflective Acrylic': 'Calculate precise mirror-like reflections on the acrylic surface beneath the product. Render caustic light patterns and glossy specular highlights.',
+    'Raw Concrete': 'Render subtle diffuse shadows on the matte concrete surface. Show micro-texture interaction where the product meets the rough surface.',
+    'Velvet Backdrop': 'Cast soft, diffused shadows with feathered edges on the velvet material. Show fabric compression where the product rests.',
+    'Polished Marble': 'Generate accurate mirror reflections on the polished marble surface with veining visible through the reflection. Add subtle caustic light scatter.',
+    'Light Oak': 'Render warm-toned shadows on the oak grain. Show subtle wood texture reflection under the product base.',
+    'Dark Walnut': 'Cast deep, warm shadows on the walnut surface with semi-reflective grain highlights.',
+    'Pine': 'Create natural soft shadows on the pine surface with visible grain interaction.',
+  };
+  const instruction = surfaceMap[material];
+  if (instruction) return instruction;
+  return 'Render physically accurate shadows and reflections based on the surface material. Ensure the product is integrated into the 3D environment with contact shadows and ambient occlusion — never a flat overlay.';
 }
 
 function getStylePrompt(style: StyleCategory, subs: Record<string, string>): string {
@@ -68,6 +96,11 @@ export function compilePrompt(input: CompilerInput): string {
     parts.push(getStylePrompt(input.style, input.subOptions));
   }
 
+  // Camera lens instruction
+  if (input.cameraLens) {
+    parts.push(getCameraInstruction(input.cameraLens));
+  }
+
   // Custom prompt / user override
   if (input.customPrompt.trim()) {
     parts.push(input.customPrompt.trim());
@@ -79,11 +112,18 @@ export function compilePrompt(input: CompilerInput): string {
     parts.push(contextInjection);
   }
 
+  // Shadow & reflection mapping for product images
+  if (input.hasProductImage) {
+    const material = input.subOptions.material || input.subOptions.wood || '';
+    parts.push(getShadowReflectionMapping(true, material));
+  }
+
   // Aspect ratio hint
   parts.push(`Aspect ratio: ${input.aspectRatio}.`);
 
-  // Global constraint always appended
+  // Global constraint + negative prompt always appended
   parts.push(GLOBAL_PROMPT_CONSTRAINT);
+  parts.push(NEGATIVE_PROMPT);
 
   return parts.join(' ');
 }

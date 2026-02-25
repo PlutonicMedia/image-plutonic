@@ -6,8 +6,10 @@ import { GeneratorPanel } from '@/components/generator/GeneratorPanel';
 import { GalleryGrid } from '@/components/generator/GalleryGrid';
 import { Lightbox } from '@/components/generator/Lightbox';
 import { LoadingOverlay } from '@/components/generator/LoadingOverlay';
+import { QueueManager } from '@/components/generator/QueueManager';
+import { AdPlacementPreviewer } from '@/components/generator/AdPlacementPreviewer';
+import { useGenerationQueue } from '@/hooks/useGenerationQueue';
 import { Client, GeneratedImage, GenerationSettings, StyleCategory } from '@/types';
-import { compilePrompt, getStyleTag } from '@/lib/promptCompiler';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Index() {
@@ -23,17 +25,18 @@ export default function Index() {
   const [productImage, setProductImage] = useState<string | null>(null);
   const [modelImage, setModelImage] = useState<string | null>(null);
   const [settings, setSettings] = useState<GenerationSettings>({
-    aspectRatio: '1:1', quality: '2k', numOutputs: 4, format: 'png',
+    aspectRatio: '1:1', quality: '2k', numOutputs: 4, format: 'png', cameraLens: '',
   });
 
-  // Style state
   const [selectedStyle, setSelectedStyle] = useState<StyleCategory | null>(null);
   const [styleSubOptions, setStyleSubOptions] = useState<Record<string, string>>({});
 
-  const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [progress, setProgress] = useState(0);
   const [lightboxImage, setLightboxImage] = useState<GeneratedImage | null>(null);
+  const [adPreviewImage, setAdPreviewImage] = useState<GeneratedImage | null>(null);
+
+  const { queue, allResults, enqueue, setAllResults } = useGenerationQueue();
+  const isGenerating = queue.some((t) => t.status === 'running');
+  const runningTask = queue.find((t) => t.status === 'running');
 
   // Auth check
   useEffect(() => {
@@ -79,71 +82,23 @@ export default function Index() {
     if (selectedClient?.id === id) setSelectedClient(null);
   };
 
-  const handleGenerate = useCallback(async () => {
+  const handleGenerate = useCallback(() => {
     if (!prompt.trim()) return;
-    setIsGenerating(true);
-    setProgress(0);
-
-    const compiledPrompt = compilePrompt({
+    enqueue({
+      prompt,
+      settings,
       style: selectedStyle,
-      subOptions: styleSubOptions,
-      customPrompt: prompt,
-      hasProductImage: !!productImage,
-      hasModelImage: !!modelImage,
-      aspectRatio: settings.aspectRatio,
+      styleSubOptions,
+      productImage,
+      modelImage,
+      clientId: selectedClient?.id,
     });
+    toast({ title: 'Added to queue', description: 'Your generation task has been queued.' });
+  }, [prompt, settings, selectedStyle, styleSubOptions, productImage, modelImage, selectedClient, enqueue, toast]);
 
-    const styleTag = getStyleTag(selectedStyle, styleSubOptions);
-
-    const progressInterval = setInterval(() => {
-      setProgress((prev) => Math.min(prev + Math.random() * 8 + 2, 90));
-    }, 500);
-
-    try {
-      const contentParts: any[] = [{ type: 'text', text: compiledPrompt }];
-      if (productImage) contentParts.push({ type: 'image_url', image_url: { url: productImage } });
-      if (modelImage) contentParts.push({ type: 'image_url', image_url: { url: modelImage } });
-
-      const messages = [{ role: 'user', content: contentParts }];
-      const newImages: GeneratedImage[] = [];
-
-      // Fire all requests concurrently for speed
-      const promises = Array.from({ length: settings.numOutputs }, (_, i) =>
-        supabase.functions.invoke('generate-creative', {
-          body: { messages, aspectRatio: settings.aspectRatio },
-        }).then(({ data, error }) => {
-          if (error) throw error;
-          if (data?.imageUrl) {
-            const img: GeneratedImage = {
-              id: `gen-${Date.now()}-${i}`,
-              url: data.imageUrl,
-              prompt: compiledPrompt,
-              client_id: selectedClient?.id,
-              created_at: new Date().toISOString(),
-              aspect_ratio: settings.aspectRatio,
-              style_tag: styleTag,
-            };
-            newImages.push(img);
-            setGeneratedImages([...newImages]);
-            setProgress(10 + (newImages.length / settings.numOutputs) * 80);
-          }
-        }).catch((err) => console.error(`Error generating image ${i + 1}:`, err))
-      );
-
-      await Promise.all(promises);
-
-      if (newImages.length === 0) {
-        toast({ title: 'Generation failed', description: 'No images were generated. Please try again.', variant: 'destructive' });
-      }
-    } catch (error: any) {
-      console.error('Generation error:', error);
-      toast({ title: 'Error', description: error.message || 'Failed to generate creatives', variant: 'destructive' });
-    } finally {
-      clearInterval(progressInterval);
-      setProgress(100);
-      setTimeout(() => setIsGenerating(false), 500);
-    }
-  }, [prompt, productImage, modelImage, settings, selectedClient, selectedStyle, styleSubOptions, toast]);
+  const handleRefinedImage = useCallback((newImage: GeneratedImage) => {
+    setAllResults((prev) => [...prev, newImage]);
+  }, [setAllResults]);
 
   const handleCreateVariants = (image: GeneratedImage) => {
     setLightboxImage(null);
@@ -197,12 +152,28 @@ export default function Index() {
           onGenerate={handleGenerate} isGenerating={isGenerating}
           selectedStyle={selectedStyle} onStyleChange={setSelectedStyle}
           styleSubOptions={styleSubOptions} onStyleSubOptionsChange={setStyleSubOptions}
+          queueCount={queue.filter((t) => t.status === 'pending' || t.status === 'running').length}
         />
-        <GalleryGrid images={generatedImages} onImageClick={setLightboxImage} onDownloadSelected={handleDownloadSelected} />
+        <GalleryGrid
+          images={allResults}
+          onImageClick={setLightboxImage}
+          onDownloadSelected={handleDownloadSelected}
+          onRefinedImage={handleRefinedImage}
+        />
       </div>
-      {isGenerating && <LoadingOverlay progress={progress} />}
+      {isGenerating && <LoadingOverlay progress={runningTask?.progress || 0} />}
+      <QueueManager queue={queue} />
       {lightboxImage && (
-        <Lightbox image={lightboxImage} onClose={() => setLightboxImage(null)} onCreateVariants={handleCreateVariants} onDownload={handleDownload} />
+        <Lightbox
+          image={lightboxImage}
+          onClose={() => setLightboxImage(null)}
+          onCreateVariants={handleCreateVariants}
+          onDownload={handleDownload}
+          onPreviewAd={setAdPreviewImage}
+        />
+      )}
+      {adPreviewImage && (
+        <AdPlacementPreviewer image={adPreviewImage} onClose={() => setAdPreviewImage(null)} />
       )}
     </div>
   );

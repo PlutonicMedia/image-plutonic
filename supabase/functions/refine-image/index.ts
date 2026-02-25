@@ -15,10 +15,11 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const { messages, aspectRatio } = await req.json();
+    const { imageUrl, instruction } = await req.json();
 
-    // Minimal system prompt — all rich instructions are in the compiled user prompt
-    const systemPrompt = `You are a photorealistic image generator. Aspect ratio: ${aspectRatio || "1:1"}. Generate the image immediately without conversational filler. No text or watermarks.`;
+    if (!imageUrl || !instruction) {
+      throw new Error("imageUrl and instruction are required");
+    }
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -29,8 +30,19 @@ serve(async (req) => {
       body: JSON.stringify({
         model: "google/gemini-3-pro-image-preview",
         messages: [
-          { role: "system", content: systemPrompt },
-          ...messages,
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: `Apply the following edit to this image. Do NOT add any text, letters, or watermarks. Maintain photorealistic quality. Edit instruction: ${instruction}`,
+              },
+              {
+                type: "image_url",
+                image_url: { url: imageUrl },
+              },
+            ],
+          },
         ],
         modalities: ["image", "text"],
       }),
@@ -38,30 +50,29 @@ serve(async (req) => {
 
     if (!response.ok) {
       if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }),
+        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again." }),
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
       if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "AI usage credits exhausted. Please add credits." }),
+        return new Response(JSON.stringify({ error: "AI credits exhausted. Please add credits." }),
           { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
       const text = await response.text();
-      console.error("AI gateway error:", response.status, text);
+      console.error("Refine error:", response.status, text);
       throw new Error(`AI gateway error: ${response.status}`);
     }
 
     const data = await response.json();
-    const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    const refinedUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
 
-    if (!imageUrl) {
-      console.error("No image in response:", JSON.stringify(data).slice(0, 500));
-      throw new Error("No image was generated. Try a different prompt.");
+    if (!refinedUrl) {
+      throw new Error("No refined image generated. Try different instructions.");
     }
 
-    return new Response(JSON.stringify({ imageUrl }),
+    return new Response(JSON.stringify({ imageUrl: refinedUrl }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (error) {
-    console.error("generate-creative error:", error);
+    console.error("refine-image error:", error);
     const message = error instanceof Error ? error.message : "Unknown error";
     return new Response(JSON.stringify({ error: message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });

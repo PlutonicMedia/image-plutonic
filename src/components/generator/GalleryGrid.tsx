@@ -2,15 +2,17 @@ import { useState } from 'react';
 import { Download, Check, ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { GeneratedImage } from '@/types';
+import { RefinementBar } from './RefinementBar';
 import { cn } from '@/lib/utils';
 
 interface GalleryGridProps {
   images: GeneratedImage[];
   onImageClick: (image: GeneratedImage) => void;
   onDownloadSelected: (images: GeneratedImage[]) => void;
+  onRefinedImage?: (newImage: GeneratedImage) => void;
 }
 
-export function GalleryGrid({ images, onImageClick, onDownloadSelected }: GalleryGridProps) {
+export function GalleryGrid({ images, onImageClick, onDownloadSelected, onRefinedImage }: GalleryGridProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const toggleSelect = (e: React.MouseEvent, id: string) => {
@@ -71,38 +73,42 @@ export function GalleryGrid({ images, onImageClick, onDownloadSelected }: Galler
 
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {images.map((image, idx) => (
-          <div
-            key={image.id}
-            className="image-card group cursor-pointer animate-fade-in"
-            style={{ animationDelay: `${idx * 60}ms` }}
-            onClick={() => onImageClick(image)}
-          >
-            <div className="aspect-square overflow-hidden">
-              <img src={image.url} alt={image.prompt} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
-            </div>
-
-            <button
-              onClick={(e) => toggleSelect(e, image.id)}
-              className={cn(
-                'absolute top-2 left-2 w-6 h-6 rounded-md border-2 flex items-center justify-center transition-all',
-                selectedIds.has(image.id)
-                  ? 'bg-primary border-primary text-primary-foreground'
-                  : 'border-card/80 bg-card/50 backdrop-blur-sm opacity-0 group-hover:opacity-100'
-              )}
+          <div key={image.id} className="animate-fade-in" style={{ animationDelay: `${idx * 60}ms` }}>
+            <div
+              className="image-card group cursor-pointer"
+              onClick={() => onImageClick(image)}
             >
-              {selectedIds.has(image.id) && <Check className="w-3.5 h-3.5" />}
-            </button>
-
-            {/* Style tag */}
-            {image.style_tag && (
-              <div className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-primary/80 text-primary-foreground text-[10px] font-medium backdrop-blur-sm">
-                {image.style_tag}
+              <div className="aspect-square overflow-hidden">
+                <img src={image.url} alt={image.prompt} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
               </div>
-            )}
 
-            <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded-md bg-card/80 backdrop-blur-sm text-[10px] font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-              {image.aspect_ratio}
+              <button
+                onClick={(e) => toggleSelect(e, image.id)}
+                className={cn(
+                  'absolute top-2 left-2 w-6 h-6 rounded-md border-2 flex items-center justify-center transition-all',
+                  selectedIds.has(image.id)
+                    ? 'bg-primary border-primary text-primary-foreground'
+                    : 'border-card/80 bg-card/50 backdrop-blur-sm opacity-0 group-hover:opacity-100'
+                )}
+              >
+                {selectedIds.has(image.id) && <Check className="w-3.5 h-3.5" />}
+              </button>
+
+              {image.style_tag && (
+                <div className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-primary/80 text-primary-foreground text-[10px] font-medium backdrop-blur-sm">
+                  {image.style_tag}
+                </div>
+              )}
+
+              <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded-md bg-card/80 backdrop-blur-sm text-[10px] font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                {image.aspect_ratio}
+              </div>
             </div>
+
+            {/* Conversational Refinement Bar */}
+            {onRefinedImage && (
+              <RefinementBar image={image} onRefined={onRefinedImage} />
+            )}
           </div>
         ))}
       </div>
