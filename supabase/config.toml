@@ -1,0 +1,4 @@
+project_id = "tfbttrvqfdtmuhmmwksj"
+
+[functions.generate-creative]
+verify_jwt = false
