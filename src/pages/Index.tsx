@@ -6,10 +6,9 @@ import { GeneratorPanel } from '@/components/generator/GeneratorPanel';
 import { GalleryGrid } from '@/components/generator/GalleryGrid';
 import { Lightbox } from '@/components/generator/Lightbox';
 import { LoadingOverlay } from '@/components/generator/LoadingOverlay';
-import { QueueManager } from '@/components/generator/QueueManager';
 import { AdPlacementPreviewer } from '@/components/generator/AdPlacementPreviewer';
 import { ClientArchive } from '@/components/generator/ClientArchive';
-import { useGenerationQueue } from '@/hooks/useGenerationQueue';
+import { useGeneration } from '@/hooks/useGeneration';
 import { Client, GeneratedImage, GenerationSettings, StyleCategory, PredefinedJsonPrompt, ClientLastSettings, PREDEFINED_JSON_PROMPTS } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 
@@ -24,8 +23,8 @@ export default function Index() {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
 
   const [prompt, setPrompt] = useState('');
-  const [productImage, setProductImage] = useState<string | null>(null);
-  const [modelImage, setModelImage] = useState<string | null>(null);
+  const [productImages, setProductImages] = useState<string[]>([]);
+  const [modelImages, setModelImages] = useState<string[]>([]);
   const [settings, setSettings] = useState<GenerationSettings>({
     aspectRatio: '1:1', quality: '2k', numOutputs: 4, format: 'png', cameraLens: '',
   });
@@ -39,9 +38,8 @@ export default function Index() {
   const [adPreviewImage, setAdPreviewImage] = useState<GeneratedImage | null>(null);
   const [showArchive, setShowArchive] = useState(false);
 
-  const { queue, allResults, enqueue, setAllResults } = useGenerationQueue();
-  const isGenerating = queue.some((t) => t.status === 'running');
-  const runningTask = queue.find((t) => t.status === 'running');
+  const { task, allResults, generate, setAllResults } = useGeneration();
+  const isGenerating = task?.status === 'running';
 
   // Auth check
   useEffect(() => {
@@ -89,45 +87,26 @@ export default function Index() {
 
   const saveClientSettings = async (clientId: string) => {
     const lastSettings: ClientLastSettings = {
-      aspectRatio: settings.aspectRatio,
-      quality: settings.quality,
-      numOutputs: settings.numOutputs,
-      format: settings.format,
-      cameraLens: settings.cameraLens,
-      selectedStyle,
-      styleSubOptions,
-      promptMode,
-      selectedJsonPromptId: selectedJsonPrompt?.id || null,
+      aspectRatio: settings.aspectRatio, quality: settings.quality, numOutputs: settings.numOutputs,
+      format: settings.format, cameraLens: settings.cameraLens, selectedStyle, styleSubOptions,
+      promptMode, selectedJsonPromptId: selectedJsonPrompt?.id || null,
     };
     await supabase.from('clients').update({ last_settings: lastSettings as any }).eq('id', clientId);
-    // Update local state
     setClients((prev) => prev.map((c) => c.id === clientId ? { ...c, last_settings: lastSettings } : c));
-    if (selectedClient?.id === clientId) {
-      setSelectedClient((prev) => prev ? { ...prev, last_settings: lastSettings } : prev);
-    }
+    if (selectedClient?.id === clientId) setSelectedClient((prev) => prev ? { ...prev, last_settings: lastSettings } : prev);
   };
 
   const saveImagesToArchive = async (images: GeneratedImage[]) => {
     if (!user) return;
     for (const img of images) {
       await supabase.from('generated_images').insert({
-        user_id: user.id,
-        client_id: img.client_id || null,
-        image_url: img.url,
-        prompt: img.prompt,
-        aspect_ratio: img.aspect_ratio,
+        user_id: user.id, client_id: img.client_id || null,
+        image_url: img.url, prompt: img.prompt, aspect_ratio: img.aspect_ratio,
       });
     }
-
-    // Enforce 30-image rotation per client
     if (images[0]?.client_id) {
       const clientId = images[0].client_id;
-      const { data: allImgs } = await supabase
-        .from('generated_images')
-        .select('id')
-        .eq('client_id', clientId)
-        .order('created_at', { ascending: false });
-
+      const { data: allImgs } = await supabase.from('generated_images').select('id').eq('client_id', clientId).order('created_at', { ascending: false });
       if (allImgs && allImgs.length > 30) {
         const idsToDelete = allImgs.slice(30).map((i) => i.id);
         await supabase.from('generated_images').delete().in('id', idsToDelete);
@@ -162,25 +141,20 @@ export default function Index() {
     const hasContent = promptMode === 'predefined' ? !!selectedJsonPrompt : !!prompt.trim();
     if (!hasContent) return;
     setShowLoadingOverlay(true);
-    enqueue({
+    generate({
       prompt: promptMode === 'manual' ? prompt : '',
-      settings,
-      style: selectedStyle,
-      styleSubOptions,
-      productImage,
-      modelImage,
+      settings, style: selectedStyle, styleSubOptions,
+      productImages, modelImages,
       clientId: selectedClient?.id,
       jsonPrompt: promptMode === 'predefined' ? selectedJsonPrompt : null,
       onComplete: async (results: GeneratedImage[]) => {
-        // Save settings and images on successful generation
         if (selectedClient?.id) {
           saveClientSettings(selectedClient.id);
           saveImagesToArchive(results);
         }
       },
     });
-    toast({ title: 'Added to queue', description: 'Your generation task has been queued.' });
-  }, [prompt, settings, selectedStyle, styleSubOptions, productImage, modelImage, selectedClient, enqueue, toast, promptMode, selectedJsonPrompt]);
+  }, [prompt, settings, selectedStyle, styleSubOptions, productImages, modelImages, selectedClient, generate, promptMode, selectedJsonPrompt]);
 
   const handleRefinedImage = useCallback((newImage: GeneratedImage) => {
     setAllResults((prev) => [...prev, newImage]);
@@ -223,55 +197,34 @@ export default function Index() {
   return (
     <div className="flex h-screen bg-background overflow-hidden">
       <AppSidebar
-        clients={clients}
-        selectedClient={selectedClient}
-        onSelectClient={setSelectedClient}
-        onAddClient={addClient}
-        onRenameClient={renameClient}
-        onDeleteClient={deleteClient}
+        clients={clients} selectedClient={selectedClient}
+        onSelectClient={setSelectedClient} onAddClient={addClient}
+        onRenameClient={renameClient} onDeleteClient={deleteClient}
         onShowArchive={() => setShowArchive(true)}
       />
       <div className="flex flex-1 min-w-0">
         <GeneratorPanel
           selectedClient={selectedClient} settings={settings} onSettingsChange={setSettings}
           prompt={prompt} onPromptChange={setPrompt}
-          productImage={productImage} onProductImageChange={setProductImage}
-          modelImage={modelImage} onModelImageChange={setModelImage}
+          productImages={productImages} onProductImagesChange={setProductImages}
+          modelImages={modelImages} onModelImagesChange={setModelImages}
           onGenerate={handleGenerate} isGenerating={isGenerating}
           selectedStyle={selectedStyle} onStyleChange={setSelectedStyle}
           styleSubOptions={styleSubOptions} onStyleSubOptionsChange={setStyleSubOptions}
-          queueCount={queue.filter((t) => t.status === 'pending' || t.status === 'running').length}
           selectedJsonPrompt={selectedJsonPrompt} onJsonPromptChange={setSelectedJsonPrompt}
           promptMode={promptMode} onPromptModeChange={setPromptMode}
         />
         {showArchive && selectedClient ? (
-          <ClientArchive
-            client={selectedClient}
-            onClose={() => setShowArchive(false)}
-            onDownloadSelected={handleDownloadSelected}
-          />
+          <ClientArchive client={selectedClient} onClose={() => setShowArchive(false)} onDownloadSelected={handleDownloadSelected} />
         ) : (
-          <GalleryGrid
-            images={allResults}
-            onImageClick={setLightboxImage}
-            onDownloadSelected={handleDownloadSelected}
-            onRefinedImage={handleRefinedImage}
-          />
+          <GalleryGrid images={allResults} onImageClick={setLightboxImage} onDownloadSelected={handleDownloadSelected} onRefinedImage={handleRefinedImage} />
         )}
       </div>
       {isGenerating && showLoadingOverlay && (
-        <LoadingOverlay progress={runningTask?.progress || 0} onDismiss={() => setShowLoadingOverlay(false)} />
+        <LoadingOverlay progress={task?.progress || 0} onDismiss={() => setShowLoadingOverlay(false)} />
       )}
-      <QueueManager queue={queue} />
       {lightboxImage && (
-        <Lightbox
-          image={lightboxImage}
-          allImages={allResults}
-          onClose={() => setLightboxImage(null)}
-          onNavigate={setLightboxImage}
-          onDownload={handleDownload}
-          onPreviewAd={setAdPreviewImage}
-        />
+        <Lightbox image={lightboxImage} allImages={allResults} onClose={() => setLightboxImage(null)} onNavigate={setLightboxImage} onDownload={handleDownload} onPreviewAd={setAdPreviewImage} />
       )}
       {adPreviewImage && (
         <AdPlacementPreviewer image={adPreviewImage} onClose={() => setAdPreviewImage(null)} />

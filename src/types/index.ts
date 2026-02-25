@@ -268,17 +268,19 @@ export const GLOBAL_PROMPT_CONSTRAINT = "Strictly no text, letters, characters, 
 
 export const NEGATIVE_PROMPT = "Negative prompt: No text, no letters, no characters, no watermarks, no distorted anatomy, no extra limbs, no extra fingers, no plastic-looking skin, no oversaturated colors, no blurry details, no low-resolution artifacts, no unrealistic proportions. Enforce high-fidelity photographic finish with natural skin textures, accurate material rendering, and physically correct lighting.";
 
-export interface QueueTask {
+export interface GenerationTask {
   id: string;
-  status: 'pending' | 'running' | 'done' | 'error';
+  status: 'running' | 'done' | 'error';
   prompt: string;
   settings: GenerationSettings;
   style: StyleCategory | null;
   styleSubOptions: Record<string, string>;
-  productImage: string | null;
-  modelImage: string | null;
+  productImages: string[];
+  modelImages: string[];
   clientId?: string;
   results: GeneratedImage[];
   error?: string;
   progress: number;
+  jsonPrompt?: PredefinedJsonPrompt | null;
+  onComplete?: (results: GeneratedImage[]) => void;
 }

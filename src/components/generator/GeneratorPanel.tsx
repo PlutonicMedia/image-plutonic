@@ -1,10 +1,11 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { Upload, X, Image, Sparkles, Settings2, Camera, FileJson, PenLine, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { MultiImageUpload } from './MultiImageUpload';
 import {
   Client, GenerationSettings, ASPECT_RATIOS,
   StyleCategory, STYLE_CATEGORIES, STYLE_SUB_OPTIONS, CAMERA_LENSES, CameraLens,
@@ -17,79 +18,34 @@ interface GeneratorPanelProps {
   onSettingsChange: (settings: GenerationSettings) => void;
   prompt: string;
   onPromptChange: (prompt: string) => void;
-  productImage: string | null;
-  onProductImageChange: (img: string | null) => void;
-  modelImage: string | null;
-  onModelImageChange: (img: string | null) => void;
+  productImages: string[];
+  onProductImagesChange: (imgs: string[]) => void;
+  modelImages: string[];
+  onModelImagesChange: (imgs: string[]) => void;
   onGenerate: () => void;
   isGenerating: boolean;
   selectedStyle: StyleCategory | null;
   onStyleChange: (style: StyleCategory | null) => void;
   styleSubOptions: Record<string, string>;
   onStyleSubOptionsChange: (opts: Record<string, string>) => void;
-  queueCount?: number;
   selectedJsonPrompt: PredefinedJsonPrompt | null;
   onJsonPromptChange: (jp: PredefinedJsonPrompt | null) => void;
   promptMode: 'predefined' | 'manual';
   onPromptModeChange: (mode: 'predefined' | 'manual') => void;
 }
 
-function ImageUploadZone({ label, image, onChange }: { label: string; image: string | null; onChange: (img: string | null) => void }) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const handleFile = (file: File) => {
-    const reader = new FileReader();
-    reader.onloadend = () => onChange(reader.result as string);
-    reader.readAsDataURL(file);
-  };
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    const file = e.dataTransfer.files[0];
-    if (file?.type.startsWith('image/')) handleFile(file);
-  };
-
-  return (
-    <div>
-      <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">{label}</Label>
-      {image ? (
-        <div className="upload-zone has-file relative">
-          <img src={image} alt={label} className="w-full h-24 object-cover rounded-md" />
-          <button onClick={() => onChange(null)} className="absolute top-1.5 right-1.5 p-1 rounded-full bg-card shadow-sm hover:bg-destructive hover:text-destructive-foreground transition-colors">
-            <X className="w-3 h-3" />
-          </button>
-        </div>
-      ) : (
-        <div className="upload-zone" onClick={() => inputRef.current?.click()} onDragOver={(e) => e.preventDefault()} onDrop={handleDrop}>
-          <Upload className="w-5 h-5 text-muted-foreground mb-1.5" />
-          <span className="text-xs text-muted-foreground">Drop or click</span>
-          <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) handleFile(file); }} />
-        </div>
-      )}
-    </div>
-  );
-}
-
 export function GeneratorPanel({
   selectedClient, settings, onSettingsChange,
   prompt, onPromptChange,
-  productImage, onProductImageChange,
-  modelImage, onModelImageChange,
+  productImages, onProductImagesChange,
+  modelImages, onModelImagesChange,
   onGenerate, isGenerating,
   selectedStyle, onStyleChange,
   styleSubOptions, onStyleSubOptionsChange,
-  queueCount = 0,
   selectedJsonPrompt, onJsonPromptChange,
   promptMode, onPromptModeChange,
 }: GeneratorPanelProps) {
-  const [queued, setQueued] = useState(false);
-
   const currentSubs = selectedStyle ? STYLE_SUB_OPTIONS[selectedStyle] : null;
-
-  const handleGenerate = () => {
-    onGenerate();
-    setQueued(true);
-    setTimeout(() => setQueued(false), 1500);
-  };
-
   const canGenerate = promptMode === 'predefined' ? !!selectedJsonPrompt : !!prompt.trim();
 
   return (
@@ -108,20 +64,20 @@ export function GeneratorPanel({
           )}
         </div>
 
-        {/* Image Uploads */}
+        {/* Image Uploads — Multi */}
         <div className="space-y-3">
           <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
             <Image className="w-3.5 h-3.5" />
             Reference Images
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <ImageUploadZone label="Product Image" image={productImage} onChange={onProductImageChange} />
-            <ImageUploadZone label="Model Image" image={modelImage} onChange={onModelImageChange} />
+            <MultiImageUpload label="Product Images" images={productImages} onChange={onProductImagesChange} max={5} />
+            <MultiImageUpload label="Model Images" images={modelImages} onChange={onModelImagesChange} max={5} />
           </div>
-          {(productImage || modelImage) && (
+          {(productImages.length > 0 || modelImages.length > 0) && (
             <div className="flex flex-wrap gap-1.5">
-              {productImage && <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">Product detected</span>}
-              {modelImage && <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">Model detected</span>}
+              {productImages.length > 0 && <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">{productImages.length} product{productImages.length !== 1 ? 's' : ''}</span>}
+              {modelImages.length > 0 && <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">{modelImages.length} model{modelImages.length !== 1 ? 's' : ''}</span>}
             </div>
           )}
         </div>
@@ -167,17 +123,10 @@ export function GeneratorPanel({
             <SelectContent>
               <SelectItem value="none" className="text-sm">No lens preference</SelectItem>
               {CAMERA_LENSES.map((l) => (
-                <SelectItem key={l.value} value={l.value} className="text-sm">
-                  {l.label}
-                </SelectItem>
+                <SelectItem key={l.value} value={l.value} className="text-sm">{l.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
-          {settings.cameraLens && (
-            <p className="text-[10px] text-muted-foreground leading-relaxed">
-              {CAMERA_LENSES.find((l) => l.value === settings.cameraLens)?.description}
-            </p>
-          )}
         </div>
 
         {/* Prompt Mode Toggle */}
@@ -187,36 +136,24 @@ export function GeneratorPanel({
             <button
               onClick={() => onPromptModeChange('predefined')}
               className={`flex-1 py-2 px-3 rounded-md text-xs font-medium transition-all flex items-center justify-center gap-1.5 ${
-                promptMode === 'predefined'
-                  ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'bg-muted text-muted-foreground hover:bg-accent'
+                promptMode === 'predefined' ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-muted text-muted-foreground hover:bg-accent'
               }`}
             >
-              <FileJson className="w-3.5 h-3.5" />
-              Predefined
+              <FileJson className="w-3.5 h-3.5" /> Predefined
             </button>
             <button
               onClick={() => onPromptModeChange('manual')}
               className={`flex-1 py-2 px-3 rounded-md text-xs font-medium transition-all flex items-center justify-center gap-1.5 ${
-                promptMode === 'manual'
-                  ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'bg-muted text-muted-foreground hover:bg-accent'
+                promptMode === 'manual' ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-muted text-muted-foreground hover:bg-accent'
               }`}
             >
-              <PenLine className="w-3.5 h-3.5" />
-              Manual
+              <PenLine className="w-3.5 h-3.5" /> Manual
             </button>
           </div>
 
           {promptMode === 'predefined' ? (
             <div className="space-y-2">
-              <Select
-                value={selectedJsonPrompt?.id || ''}
-                onValueChange={(v) => {
-                  const jp = PREDEFINED_JSON_PROMPTS.find((p) => p.id === v) || null;
-                  onJsonPromptChange(jp);
-                }}
-              >
+              <Select value={selectedJsonPrompt?.id || ''} onValueChange={(v) => { const jp = PREDEFINED_JSON_PROMPTS.find((p) => p.id === v) || null; onJsonPromptChange(jp); }}>
                 <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Choose a predefined prompt..." /></SelectTrigger>
                 <SelectContent>
                   {PREDEFINED_JSON_PROMPTS.map((p) => (
@@ -228,41 +165,27 @@ export function GeneratorPanel({
                 <div className="p-3 rounded-lg bg-muted/50 border border-border text-xs text-muted-foreground space-y-1.5">
                   <p className="font-medium text-foreground text-[11px]">{selectedJsonPrompt.name}</p>
                   <p className="leading-relaxed line-clamp-4">{selectedJsonPrompt.scene.environment}</p>
-                  <p className="text-[10px] text-muted-foreground/60 italic">This prompt auto-adapts based on uploaded images</p>
+                  <p className="text-[10px] text-muted-foreground/60 italic">Auto-adapts based on uploaded images</p>
                 </div>
               )}
             </div>
           ) : (
-            <Textarea
-              value={prompt}
-              onChange={(e) => onPromptChange(e.target.value)}
-              placeholder="Describe your creative vision..."
-              className="min-h-[90px] text-sm resize-none"
-            />
+            <Textarea value={prompt} onChange={(e) => onPromptChange(e.target.value)} placeholder="Describe your creative vision..." className="min-h-[90px] text-sm resize-none" />
           )}
         </div>
 
         {/* Output Settings */}
         <div className="space-y-3">
           <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-            <Settings2 className="w-3.5 h-3.5" />
-            Output Settings
+            <Settings2 className="w-3.5 h-3.5" /> Output Settings
           </div>
           <div>
             <Label className="text-xs text-muted-foreground mb-1.5 block">Aspect Ratio</Label>
             <div className="flex gap-1.5">
               {ASPECT_RATIOS.map((ar) => (
-                <button
-                  key={ar.value}
-                  onClick={() => onSettingsChange({ ...settings, aspectRatio: ar.value })}
-                  className={`flex-1 py-1.5 px-2 rounded-md text-xs font-medium transition-all ${
-                    settings.aspectRatio === ar.value
-                      ? 'bg-primary text-primary-foreground shadow-sm'
-                      : 'bg-muted text-muted-foreground hover:bg-accent'
-                  }`}
-                >
-                  {ar.label}
-                </button>
+                <button key={ar.value} onClick={() => onSettingsChange({ ...settings, aspectRatio: ar.value })}
+                  className={`flex-1 py-1.5 px-2 rounded-md text-xs font-medium transition-all ${settings.aspectRatio === ar.value ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-muted text-muted-foreground hover:bg-accent'}`}
+                >{ar.label}</button>
               ))}
             </div>
           </div>
@@ -271,21 +194,14 @@ export function GeneratorPanel({
               <Label className="text-xs text-muted-foreground mb-1.5 block">Quality</Label>
               <Select value={settings.quality} onValueChange={(v) => onSettingsChange({ ...settings, quality: v as '2k' | '4k' })}>
                 <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="2k">2K</SelectItem>
-                  <SelectItem value="4k">4K</SelectItem>
-                </SelectContent>
+                <SelectContent><SelectItem value="2k">2K</SelectItem><SelectItem value="4k">4K</SelectItem></SelectContent>
               </Select>
             </div>
             <div>
               <Label className="text-xs text-muted-foreground mb-1.5 block">Format</Label>
               <Select value={settings.format} onValueChange={(v) => onSettingsChange({ ...settings, format: v as 'png' | 'jpg' | 'webp' })}>
                 <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="png">PNG</SelectItem>
-                  <SelectItem value="jpg">JPG</SelectItem>
-                  <SelectItem value="webp">WebP</SelectItem>
-                </SelectContent>
+                <SelectContent><SelectItem value="png">PNG</SelectItem><SelectItem value="jpg">JPG</SelectItem><SelectItem value="webp">WebP</SelectItem></SelectContent>
               </Select>
             </div>
           </div>
@@ -299,23 +215,11 @@ export function GeneratorPanel({
         </div>
 
         {/* Generate Button */}
-        <Button
-          onClick={handleGenerate}
-          disabled={!canGenerate}
-          className="w-full h-11 font-display font-semibold text-sm shadow-soft"
-          size="lg"
-        >
-          {queued ? (
-            <span className="flex items-center gap-2">
-              <Check className="w-4 h-4" />
-              Queued!
-            </span>
-          ) : (
-            <span className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4" />
-              {queueCount > 0 ? `Queue (${queueCount}/5)` : `Generate ${settings.numOutputs} Creative${settings.numOutputs > 1 ? 's' : ''}`}
-            </span>
-          )}
+        <Button onClick={onGenerate} disabled={!canGenerate || isGenerating} className="w-full h-11 font-display font-semibold text-sm shadow-soft" size="lg">
+          <span className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4" />
+            {isGenerating ? 'Generating…' : `Generate ${settings.numOutputs} Creative${settings.numOutputs > 1 ? 's' : ''}`}
+          </span>
         </Button>
       </div>
     </div>
