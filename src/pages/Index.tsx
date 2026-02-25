@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 
 export default function Index() {
   const navigate = useNavigate();
+  const [showLoadingOverlay, setShowLoadingOverlay] = useState(true);
   const { toast } = useToast();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -84,6 +85,7 @@ export default function Index() {
 
   const handleGenerate = useCallback(() => {
     if (!prompt.trim()) return;
+    setShowLoadingOverlay(true);
     enqueue({
       prompt,
       settings,
@@ -161,7 +163,9 @@ export default function Index() {
           onRefinedImage={handleRefinedImage}
         />
       </div>
-      {isGenerating && <LoadingOverlay progress={runningTask?.progress || 0} />}
+      {isGenerating && showLoadingOverlay && (
+        <LoadingOverlay progress={runningTask?.progress || 0} onDismiss={() => setShowLoadingOverlay(false)} />
+      )}
       <QueueManager queue={queue} />
       {lightboxImage && (
         <Lightbox
