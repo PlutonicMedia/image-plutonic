@@ -24,11 +24,8 @@ export function GalleryGrid({ images, onImageClick, onDownloadSelected }: Galler
   };
 
   const selectAll = () => {
-    if (selectedIds.size === images.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(images.map((i) => i.id)));
-    }
+    if (selectedIds.size === images.length) setSelectedIds(new Set());
+    else setSelectedIds(new Set(images.map((i) => i.id)));
   };
 
   const selectedImages = images.filter((i) => selectedIds.has(i.id));
@@ -51,12 +48,9 @@ export function GalleryGrid({ images, onImageClick, onDownloadSelected }: Galler
 
   return (
     <div className="gallery-area">
-      {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div>
-          <h2 className="text-base font-display font-semibold">
-            Generated Creatives
-          </h2>
+          <h2 className="text-base font-display font-semibold">Generated Creatives</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
             {images.length} image{images.length !== 1 ? 's' : ''}
             {selectedIds.size > 0 && ` · ${selectedIds.size} selected`}
@@ -75,7 +69,6 @@ export function GalleryGrid({ images, onImageClick, onDownloadSelected }: Galler
         </div>
       </div>
 
-      {/* Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {images.map((image, idx) => (
           <div
@@ -85,15 +78,9 @@ export function GalleryGrid({ images, onImageClick, onDownloadSelected }: Galler
             onClick={() => onImageClick(image)}
           >
             <div className="aspect-square overflow-hidden">
-              <img
-                src={image.url}
-                alt={image.prompt}
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                loading="lazy"
-              />
+              <img src={image.url} alt={image.prompt} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
             </div>
 
-            {/* Selection checkbox */}
             <button
               onClick={(e) => toggleSelect(e, image.id)}
               className={cn(
@@ -106,7 +93,13 @@ export function GalleryGrid({ images, onImageClick, onDownloadSelected }: Galler
               {selectedIds.has(image.id) && <Check className="w-3.5 h-3.5" />}
             </button>
 
-            {/* Aspect ratio badge */}
+            {/* Style tag */}
+            {image.style_tag && (
+              <div className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-primary/80 text-primary-foreground text-[10px] font-medium backdrop-blur-sm">
+                {image.style_tag}
+              </div>
+            )}
+
             <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded-md bg-card/80 backdrop-blur-sm text-[10px] font-medium opacity-0 group-hover:opacity-100 transition-opacity">
               {image.aspect_ratio}
             </div>

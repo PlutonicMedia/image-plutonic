@@ -30,6 +30,7 @@ export interface GeneratedImage {
   client_id?: string;
   created_at: string;
   aspect_ratio: string;
+  style_tag?: string;
 }
 
 export interface GenerationSettings {
@@ -38,6 +39,82 @@ export interface GenerationSettings {
   numOutputs: number;
   format: 'png' | 'jpg' | 'webp';
 }
+
+export type StyleCategory =
+  | 'studio'
+  | 'lifestyle'
+  | 'outdoor'
+  | 'urban'
+  | 'futuristic'
+  | 'scandi'
+  | 'luxury'
+  | 'sexy';
+
+export interface StyleSubOptions {
+  [key: string]: string[];
+}
+
+export const STYLE_CATEGORIES: { value: StyleCategory; label: string }[] = [
+  { value: 'studio', label: 'Studio' },
+  { value: 'lifestyle', label: 'Lifestyle (Influencer)' },
+  { value: 'outdoor', label: 'Outdoor' },
+  { value: 'urban', label: 'Urban' },
+  { value: 'futuristic', label: 'Futuristic' },
+  { value: 'scandi', label: 'Scandi (Minimalist)' },
+  { value: 'luxury', label: 'Luxury' },
+  { value: 'sexy', label: 'Sexy' },
+];
+
+export const STYLE_SUB_OPTIONS: Record<StyleCategory, { dropdowns: { label: string; key: string; options: string[] }[] }> = {
+  studio: {
+    dropdowns: [
+      { label: 'Lighting Preset', key: 'lighting', options: ['Rembrandt', 'High Key', 'Rim Lighting', 'Softbox'] },
+      { label: 'Material Preset', key: 'material', options: ['Reflective Acrylic', 'Raw Concrete', 'Velvet Backdrop', 'Polished Marble'] },
+    ],
+  },
+  lifestyle: {
+    dropdowns: [
+      { label: 'Natural Lighting', key: 'lighting', options: ['Golden Hour', 'Overcast', 'Direct Sunlight'] },
+      { label: 'Location', key: 'location', options: ['Copenhagen Street', 'Apartment Bathroom', 'Minimalist Living Room', 'Designer Kitchen'] },
+    ],
+  },
+  outdoor: {
+    dropdowns: [
+      { label: 'Season', key: 'season', options: ['Summer', 'Autumn', 'Winter'] },
+      { label: 'Landscape', key: 'landscape', options: ['Forest', 'Beach', 'Mountain', 'Desert'] },
+    ],
+  },
+  urban: {
+    dropdowns: [
+      { label: 'Weather', key: 'weather', options: ['Rainy with reflections', 'Bright and Sunny'] },
+      { label: 'Architectural Style', key: 'architecture', options: ['Industrial', 'Brutalist', 'Modern Glass'] },
+    ],
+  },
+  futuristic: {
+    dropdowns: [
+      { label: 'Atmosphere', key: 'atmosphere', options: ['Cyberpunk Neon', 'Clean White Minimalism'] },
+      { label: 'Technology Level', key: 'tech', options: ['Holographic', 'Organic Tech'] },
+    ],
+  },
+  scandi: {
+    dropdowns: [
+      { label: 'Wood Tones', key: 'wood', options: ['Light Oak', 'Dark Walnut', 'Pine'] },
+      { label: 'Color Palette', key: 'palette', options: ['Monochrome', 'Earth Tones'] },
+    ],
+  },
+  luxury: {
+    dropdowns: [
+      { label: 'Lens Type', key: 'lens', options: ['Macro', 'Wide Angle'] },
+      { label: 'Texture Priority', key: 'texture', options: ['Silk', 'Gold Leaf', 'Premium Leather'] },
+    ],
+  },
+  sexy: {
+    dropdowns: [
+      { label: 'Mood', key: 'mood', options: ['Low-key lighting', 'Intimate shadows'] },
+      { label: 'Texture', key: 'texture', options: ['Satin', 'Lace', 'Water droplets'] },
+    ],
+  },
+};
 
 export const PREDEFINED_PROMPTS: PromptTemplate[] = [
   {
@@ -91,3 +168,5 @@ export const LOADING_MESSAGES = [
   'Do you need help balancing ROAS and POAS for your paid ads in 2026? Contact Head of Social Mikkel Hermansen at mh@plutonic.dk',
   'Are you interested in becoming a worse version of yourself? Contact Head of Aura Loss Jacob Stender at js@plutonic.dk',
 ];
+
+export const GLOBAL_PROMPT_CONSTRAINT = "Strictly no text, letters, characters, or watermarks in the image. The output must be purely visual. Focus on photorealistic textures, cinematic lighting, and high-fidelity rendering of materials.";

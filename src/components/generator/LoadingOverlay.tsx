@@ -24,11 +24,9 @@ export function LoadingOverlay({ progress = 0 }: LoadingOverlayProps) {
       className="fixed inset-0 z-40 flex items-center justify-center bg-primary/95 backdrop-blur-md"
     >
       <div className="flex flex-col items-center max-w-lg px-8">
-        {/* Spinner */}
-        <div className="relative w-20 h-20 mb-8">
-          <div className="absolute inset-0 rounded-full border-[3px] border-primary-foreground/10" />
-          <div className="absolute inset-0 rounded-full border-[3px] border-transparent border-t-primary-foreground animate-spin" />
-          <div className="absolute inset-3 rounded-full border-[2px] border-transparent border-b-primary-foreground/40 animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }} />
+        {/* GIF */}
+        <div className="w-40 h-40 mb-6 rounded-2xl overflow-hidden shadow-lg">
+          <img src="/loading.gif" alt="Loading" className="w-full h-full object-cover" />
         </div>
 
         {/* Status */}
