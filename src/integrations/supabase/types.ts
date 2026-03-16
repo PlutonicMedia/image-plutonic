@@ -58,6 +58,38 @@ export type Database = {
           },
         ]
       }
+      brand_presets: {
+        Row: {
+          created_at: string
+          customer_id: string
+          id: string
+          name: string
+          preset_data: Json | null
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          id?: string
+          name: string
+          preset_data?: Json | null
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          id?: string
+          name?: string
+          preset_data?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brand_presets_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           created_at: string
@@ -77,6 +109,30 @@ export type Database = {
           created_at?: string
           id?: string
           last_settings?: Json | null
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      customers: {
+        Row: {
+          created_at: string
+          id: string
+          logo_url: string | null
+          name: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          logo_url?: string | null
+          name: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          logo_url?: string | null
           name?: string
           user_id?: string
         }
@@ -120,6 +176,79 @@ export type Database = {
           },
         ]
       }
+      generations: {
+        Row: {
+          ad_copy: Json | null
+          created_at: string
+          id: string
+          is_grid: boolean
+          output_url: string | null
+          params: Json | null
+          project_id: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          ad_copy?: Json | null
+          created_at?: string
+          id?: string
+          is_grid?: boolean
+          output_url?: string | null
+          params?: Json | null
+          project_id?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          ad_copy?: Json | null
+          created_at?: string
+          id?: string
+          is_grid?: boolean
+          output_url?: string | null
+          params?: Json | null
+          project_id?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generations_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projects: {
+        Row: {
+          created_at: string
+          customer_id: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projects_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       prompt_templates: {
         Row: {
           client_id: string | null
@@ -157,6 +286,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      saved_models: {
+        Row: {
+          created_at: string
+          id: string
+          image_url: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          image_url: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          image_url?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
       }
     }
     Views: {
