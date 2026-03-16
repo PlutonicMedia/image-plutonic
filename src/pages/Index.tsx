@@ -27,19 +27,17 @@ export default function Index() {
   const [adCopy, setAdCopy] = useState<AdCopy | null>(null);
 
   // Generation inputs
-  const [prompt, setPrompt] = useState('');
   const [influencePrompt, setInfluencePrompt] = useState('');
   const [productImages, setProductImages] = useState<string[]>([]);
   const [modelImages, setModelImages] = useState<string[]>([]);
   const [settings, setSettings] = useState<GenerationSettings>({
-    aspectRatio: '1:1', quality: '2k', numOutputs: 4, format: 'png', cameraLens: '', cameraAngle: '',
+    aspectRatio: '1:1', quality: '2k', numOutputs: 4, format: 'png', cameraLens: '', cameraAngle: '', draftMode: false,
   });
   const [isGrid, setIsGrid] = useState(false);
 
   const [selectedStyle, setSelectedStyle] = useState<StyleCategory | null>(null);
   const [styleSubOptions, setStyleSubOptions] = useState<Record<string, string>>({});
   const [selectedJsonPrompt, setSelectedJsonPrompt] = useState<PredefinedJsonPrompt | null>(null);
-  const [promptMode, setPromptMode] = useState<'predefined' | 'manual'>('manual');
 
   const [lightboxImage, setLightboxImage] = useState<GeneratedImage | null>(null);
   const [adPreviewImage, setAdPreviewImage] = useState<GeneratedImage | null>(null);
@@ -119,25 +117,29 @@ export default function Index() {
   };
 
   const handleGenerate = useCallback(() => {
-    const hasContent = promptMode === 'predefined' ? !!selectedJsonPrompt : !!prompt.trim();
-    if (!hasContent) return;
+    // With unified prompting, we always have enough context — at minimum a scene template, style, or influence prompt
+    const hasContext = !!selectedJsonPrompt || !!selectedStyle || !!influencePrompt.trim() || productImages.length > 0;
+    if (!hasContext) {
+      toast({ title: 'Missing input', description: 'Select a scene template, style, or type an influence prompt.', variant: 'destructive' });
+      return;
+    }
     setShowLoadingOverlay(true);
     generate({
-      prompt: promptMode === 'manual' ? prompt : '',
+      prompt: '', // No separate "manual prompt" — influence prompt handles it
       settings, style: selectedStyle, styleSubOptions,
       productImages, modelImages,
       clientId: selectedCustomer?.id,
-      jsonPrompt: promptMode === 'predefined' ? selectedJsonPrompt : null,
+      jsonPrompt: selectedJsonPrompt,
       influencePrompt,
       scrapedProduct,
+      isGrid,
       onComplete: async (results: GeneratedImage[]) => {
-        // Extract ad copy from first result
         const firstAdCopy = results.find((r) => r.ad_copy)?.ad_copy || null;
         if (firstAdCopy) setAdCopy(firstAdCopy);
         saveGeneration(results);
       },
     });
-  }, [prompt, settings, selectedStyle, styleSubOptions, productImages, modelImages, selectedCustomer, generate, promptMode, selectedJsonPrompt, influencePrompt, scrapedProduct, selectedProject, isGrid]);
+  }, [settings, selectedStyle, styleSubOptions, productImages, modelImages, selectedCustomer, generate, selectedJsonPrompt, influencePrompt, scrapedProduct, selectedProject, isGrid]);
 
   const handleRefinedImage = useCallback((newImage: GeneratedImage) => {
     setAllResults((prev) => [...prev, newImage]);
@@ -207,10 +209,6 @@ export default function Index() {
         onStyleSubOptionsChange={setStyleSubOptions}
         selectedJsonPrompt={selectedJsonPrompt}
         onJsonPromptChange={setSelectedJsonPrompt}
-        promptMode={promptMode}
-        onPromptModeChange={setPromptMode}
-        prompt={prompt}
-        onPromptChange={setPrompt}
         influencePrompt={influencePrompt}
         onInfluencePromptChange={setInfluencePrompt}
         onGridChange={setIsGrid}

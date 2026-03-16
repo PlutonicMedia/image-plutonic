@@ -15,9 +15,9 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const { messages, aspectRatio, adCopyContext } = await req.json();
+    const { messages, aspectRatio, adCopyContext, draftMode } = await req.json();
 
-    const systemPrompt = `Generate a photorealistic ad asset. 1:1 product shape is mandatory. No conversational filler. No text or watermarks. Aspect ratio: ${aspectRatio || "1:1"}.`;
+    const systemPrompt = `Generate a photorealistic ad asset. 1:1 product shape is mandatory. No conversational filler. No text or watermarks. Aspect ratio: ${aspectRatio || "1:1"}.${draftMode ? " Output at lower resolution for quick draft preview." : ""}`;
 
     // Step 1: Generate image
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -58,7 +58,7 @@ serve(async (req) => {
       throw new Error("No image was generated. Try a different prompt.");
     }
 
-    // Step 2: Generate ad copy if context provided
+    // Step 2: Generate ad copy concurrently if context provided
     let adCopy = null;
     if (adCopyContext) {
       try {

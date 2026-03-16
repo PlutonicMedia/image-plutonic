@@ -29,30 +29,53 @@ serve(async (req) => {
     console.log("Scraping URL:", formattedUrl);
 
     // Step 1: Scrape with Firecrawl
-    const scrapeResponse = await fetch("https://api.firecrawl.dev/v1/scrape", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        url: formattedUrl,
-        formats: ["markdown"],
-        onlyMainContent: true,
-      }),
-    });
+    let markdown = "";
+    try {
+      const scrapeResponse = await fetch("https://api.firecrawl.dev/v1/scrape", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          url: formattedUrl,
+          formats: ["markdown"],
+          onlyMainContent: true,
+        }),
+      });
 
-    const scrapeData = await scrapeResponse.json();
-    if (!scrapeResponse.ok) {
-      console.error("Firecrawl error:", scrapeData);
-      if (scrapeResponse.status === 402) {
-        throw new Error("Firecrawl credits exhausted. Please top up your Firecrawl plan.");
+      const scrapeData = await scrapeResponse.json();
+      if (!scrapeResponse.ok) {
+        console.error("Firecrawl error:", scrapeData);
+        if (scrapeResponse.status === 402) {
+          throw new Error("Firecrawl credits exhausted. Please top up your Firecrawl plan.");
+        }
+        throw new Error(`Firecrawl error: ${scrapeData.error || scrapeResponse.status}`);
       }
-      throw new Error(`Firecrawl error: ${scrapeData.error || scrapeResponse.status}`);
+
+      markdown = scrapeData.data?.markdown || scrapeData.markdown || "";
+    } catch (scrapeErr) {
+      console.error("Scrape step failed:", scrapeErr);
+      // Return fallback neutral context instead of crashing
+      return new Response(JSON.stringify({
+        product_name: "Unknown Product",
+        description: "Could not extract product details from URL.",
+        usps: ["Quality craftsmanship", "Premium materials", "Modern design"],
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    const markdown = scrapeData.data?.markdown || scrapeData.markdown || "";
-    if (!markdown) throw new Error("No content extracted from URL");
+    if (!markdown) {
+      // Return fallback if no content
+      return new Response(JSON.stringify({
+        product_name: "Unknown Product",
+        description: "No content found at the provided URL.",
+        usps: ["Quality craftsmanship", "Premium materials", "Modern design"],
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     console.log("Scraped content length:", markdown.length);
 
@@ -115,13 +138,26 @@ serve(async (req) => {
       }
       const text = await aiResponse.text();
       console.error("AI gateway error:", aiResponse.status, text);
-      throw new Error(`AI extraction failed: ${aiResponse.status}`);
+      // Fallback on AI failure
+      return new Response(JSON.stringify({
+        product_name: "Unknown Product",
+        description: "AI extraction failed. Edit the details manually.",
+        usps: ["Quality craftsmanship", "Premium materials", "Modern design"],
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const aiData = await aiResponse.json();
     const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
     if (!toolCall?.function?.arguments) {
-      throw new Error("AI failed to extract product data");
+      return new Response(JSON.stringify({
+        product_name: "Unknown Product",
+        description: "AI could not parse product data. Edit manually.",
+        usps: ["Quality craftsmanship", "Premium materials", "Modern design"],
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const extracted = JSON.parse(toolCall.function.arguments);

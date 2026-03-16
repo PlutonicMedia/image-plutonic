@@ -36,10 +36,6 @@ interface DashboardLayoutProps {
   onStyleSubOptionsChange: (o: Record<string, string>) => void;
   selectedJsonPrompt: PredefinedJsonPrompt | null;
   onJsonPromptChange: (jp: PredefinedJsonPrompt | null) => void;
-  promptMode: 'predefined' | 'manual';
-  onPromptModeChange: (m: 'predefined' | 'manual') => void;
-  prompt: string;
-  onPromptChange: (p: string) => void;
   influencePrompt: string;
   onInfluencePromptChange: (p: string) => void;
   onGridChange: (g: boolean) => void;
@@ -83,10 +79,6 @@ export function DashboardLayout(props: DashboardLayoutProps) {
         onStyleSubOptionsChange={props.onStyleSubOptionsChange}
         selectedJsonPrompt={props.selectedJsonPrompt}
         onJsonPromptChange={props.onJsonPromptChange}
-        promptMode={props.promptMode}
-        onPromptModeChange={props.onPromptModeChange}
-        prompt={props.prompt}
-        onPromptChange={props.onPromptChange}
         influencePrompt={props.influencePrompt}
         onInfluencePromptChange={props.onInfluencePromptChange}
         isGrid={props.isGrid}
