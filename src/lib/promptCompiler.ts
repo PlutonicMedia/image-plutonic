@@ -1,4 +1,4 @@
-import { StyleCategory, GLOBAL_PROMPT_CONSTRAINT, NEGATIVE_PROMPT, CameraLens, PredefinedJsonPrompt } from '@/types';
+import { StyleCategory, GLOBAL_PROMPT_CONSTRAINT, NEGATIVE_PROMPT, CameraLens, CameraAngle, PredefinedJsonPrompt } from '@/types';
 
 interface CompilerInput {
   style: StyleCategory | null;
@@ -8,7 +8,10 @@ interface CompilerInput {
   hasModelImage: boolean;
   aspectRatio: string;
   cameraLens?: CameraLens | '';
+  cameraAngle?: CameraAngle | '';
   jsonPrompt?: PredefinedJsonPrompt | null;
+  influencePrompt?: string;
+  scrapedUsps?: string[];
 }
 
 function getCameraInstruction(lens: CameraLens): string {
@@ -19,6 +22,19 @@ function getCameraInstruction(lens: CameraLens): string {
       return 'Shot on 24mm wide-angle lens: expansive field of view, deep depth of field keeping foreground and background sharp, slight barrel perspective ideal for environmental and architectural scenes.';
     case '35mm':
       return 'Shot on 35mm standard lens: cinematic natural-eye perspective, balanced depth of field, no visible distortion, organic and immersive framing.';
+  }
+}
+
+function getCameraAngleInstruction(angle: CameraAngle): string {
+  switch (angle) {
+    case 'eye-level':
+      return 'Camera positioned at eye-level: straight-on perspective creating a natural, relatable viewpoint. Subject fills the frame at its natural height with minimal perspective distortion.';
+    case 'top-down':
+      return 'Camera positioned directly overhead for a flat-lay / bird\'s-eye composition. Subject is viewed from 90° above, ideal for product layouts, food photography, and organized arrangements.';
+    case 'hero-angle':
+      return 'Camera positioned at a low hero angle (approximately 15-25° from ground level), looking upward at the subject. Creates a sense of power, dominance, and aspiration. The subject appears larger-than-life and commanding.';
+    case 'macro':
+      return 'Extreme macro close-up perspective: camera positioned within centimeters of the subject to reveal intricate textures, material details, and surface qualities invisible to the naked eye. Razor-thin depth of field with exquisite detail rendering.';
   }
 }
 
@@ -91,6 +107,9 @@ function getStylePrompt(style: StyleCategory, subs: Record<string, string>): str
   }
 }
 
+/** 1:1 product consistency instruction block */
+const CONSISTENCY_BLOCK = "CRITICAL — 1:1 PRODUCT CONSISTENCY: The uploaded product images are the absolute structural reference. Replicate the exact pixel-level shape, color, branding, label text, and proportions of the product. Product fidelity takes priority over all stylistic instructions. Do not alter, simplify, or reimagine the product design in any way.";
+
 /** Compile a predefined JSON prompt into a full prompt string */
 function compileJsonPrompt(jp: PredefinedJsonPrompt, hasProduct: boolean, hasModel: boolean): string {
   const parts: string[] = [];
@@ -99,7 +118,6 @@ function compileJsonPrompt(jp: PredefinedJsonPrompt, hasProduct: boolean, hasMod
   parts.push(jp.scene.camera);
   parts.push(jp.scene.composition);
 
-  // Conditional subject logic
   if (hasProduct && hasModel) {
     parts.push(jp.scene.subjectWithBoth);
   } else if (hasProduct) {
@@ -117,36 +135,51 @@ function compileJsonPrompt(jp: PredefinedJsonPrompt, hasProduct: boolean, hasMod
 export function compilePrompt(input: CompilerInput): string {
   const parts: string[] = [];
 
-  // If a predefined JSON prompt is selected, use it as the primary source
+  // ── 1. Preset Context ──
   if (input.jsonPrompt) {
     parts.push(compileJsonPrompt(input.jsonPrompt, input.hasProductImage, input.hasModelImage));
   } else {
-    // Style-specific rich description
     if (input.style) {
       parts.push(getStylePrompt(input.style, input.subOptions));
     }
 
-    // Camera lens instruction
     if (input.cameraLens) {
       parts.push(getCameraInstruction(input.cameraLens));
     }
 
-    // Custom prompt / user override
     if (input.customPrompt.trim()) {
       parts.push(input.customPrompt.trim());
     }
 
-    // Context-aware image injection
     const contextInjection = getContextInjection(input.hasProductImage, input.hasModelImage);
     if (contextInjection) {
       parts.push(contextInjection);
     }
 
-    // Shadow & reflection mapping for product images
     if (input.hasProductImage) {
       const material = input.subOptions.material || input.subOptions.wood || '';
       parts.push(getShadowReflectionMapping(true, material));
     }
+  }
+
+  // ── 2. Camera Angle ──
+  if (input.cameraAngle) {
+    parts.push(getCameraAngleInstruction(input.cameraAngle));
+  }
+
+  // ── 3. Influence Prompt (always-on free text) ──
+  if (input.influencePrompt?.trim()) {
+    parts.push(`Additional creative direction: ${input.influencePrompt.trim()}`);
+  }
+
+  // ── 4. Scraped USPs ──
+  if (input.scrapedUsps && input.scrapedUsps.length > 0) {
+    parts.push(`Key product selling points to visually emphasize: ${input.scrapedUsps.join('; ')}.`);
+  }
+
+  // ── 5. 1:1 Consistency ──
+  if (input.hasProductImage) {
+    parts.push(CONSISTENCY_BLOCK);
   }
 
   // Aspect ratio hint

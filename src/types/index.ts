@@ -1,3 +1,46 @@
+// ── Agency Hierarchy ─────────────────────────────────────────────────────
+
+export interface Customer {
+  id: string;
+  user_id: string;
+  name: string;
+  logo_url?: string | null;
+  created_at: string;
+}
+
+export interface Project {
+  id: string;
+  customer_id: string;
+  name: string;
+  created_at: string;
+}
+
+export interface Generation {
+  id: string;
+  project_id?: string | null;
+  user_id: string;
+  status: string;
+  params?: Record<string, any> | null;
+  output_url?: string | null;
+  ad_copy?: AdCopy | null;
+  is_grid: boolean;
+  created_at: string;
+}
+
+export interface ScrapedProduct {
+  product_name: string;
+  description: string;
+  usps: string[];
+}
+
+export interface AdCopy {
+  hook: string;
+  body: string;
+  cta: string;
+}
+
+// ── Legacy (kept for archive compatibility) ──────────────────────────────
+
 export interface ClientLastSettings {
   aspectRatio?: string;
   quality?: string;
@@ -44,6 +87,7 @@ export interface GeneratedImage {
   created_at: string;
   aspect_ratio: string;
   style_tag?: string;
+  ad_copy?: AdCopy | null;
 }
 
 export interface GenerationSettings {
@@ -52,6 +96,7 @@ export interface GenerationSettings {
   numOutputs: number;
   format: 'png' | 'jpg' | 'webp';
   cameraLens: CameraLens | '';
+  cameraAngle: CameraAngle | '';
 }
 
 export type CameraLens = '85mm' | '24mm' | '35mm';
@@ -60,6 +105,15 @@ export const CAMERA_LENSES: { value: CameraLens; label: string; description: str
   { value: '85mm', label: '85mm f/1.8', description: 'Shallow DoF, creamy bokeh, sharp subject — ideal for portraits' },
   { value: '24mm', label: '24mm Wide Angle', description: 'Wide perspective, deep DoF — ideal for outdoor & urban' },
   { value: '35mm', label: '35mm Standard', description: 'Cinematic, natural-eye perspective' },
+];
+
+export type CameraAngle = 'eye-level' | 'top-down' | 'hero-angle' | 'macro';
+
+export const CAMERA_ANGLES: { value: CameraAngle; label: string; description: string }[] = [
+  { value: 'eye-level', label: 'Eye-Level', description: 'Natural, straight-on perspective at subject height' },
+  { value: 'top-down', label: 'Top-Down / Flat Lay', description: 'Bird\'s eye view, perfect for product layouts' },
+  { value: 'hero-angle', label: 'Hero Angle (Low)', description: 'Low-angle shot making the subject look powerful and dominant' },
+  { value: 'macro', label: 'Macro / Close-Up', description: 'Extreme close-up revealing texture and fine detail' },
 ];
 
 export type StyleCategory =

@@ -15,11 +15,11 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const { messages, aspectRatio } = await req.json();
+    const { messages, aspectRatio, adCopyContext } = await req.json();
 
-    // Minimal system prompt — all rich instructions are in the compiled user prompt
-    const systemPrompt = `You are a photorealistic image generator. Aspect ratio: ${aspectRatio || "1:1"}. Generate the image immediately without conversational filler. No text or watermarks.`;
+    const systemPrompt = `Generate a photorealistic ad asset. 1:1 product shape is mandatory. No conversational filler. No text or watermarks. Aspect ratio: ${aspectRatio || "1:1"}.`;
 
+    // Step 1: Generate image
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -58,7 +58,64 @@ serve(async (req) => {
       throw new Error("No image was generated. Try a different prompt.");
     }
 
-    return new Response(JSON.stringify({ imageUrl }),
+    // Step 2: Generate ad copy if context provided
+    let adCopy = null;
+    if (adCopyContext) {
+      try {
+        const copyResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash-lite",
+            messages: [
+              {
+                role: "system",
+                content: "You are an expert ad copywriter. Write punchy, conversion-focused ad copy. Be concise.",
+              },
+              {
+                role: "user",
+                content: `Write ad copy for this product:\nName: ${adCopyContext.product_name}\nDescription: ${adCopyContext.description}\nUSPs: ${adCopyContext.usps?.join(', ')}`,
+              },
+            ],
+            tools: [
+              {
+                type: "function",
+                function: {
+                  name: "generate_ad_copy",
+                  description: "Generate hook, body, and CTA for an ad",
+                  parameters: {
+                    type: "object",
+                    properties: {
+                      hook: { type: "string", description: "Attention-grabbing headline (max 10 words)" },
+                      body: { type: "string", description: "Persuasive body text (1-2 sentences)" },
+                      cta: { type: "string", description: "Call-to-action text (2-5 words)" },
+                    },
+                    required: ["hook", "body", "cta"],
+                    additionalProperties: false,
+                  },
+                },
+              },
+            ],
+            tool_choice: { type: "function", function: { name: "generate_ad_copy" } },
+          }),
+        });
+
+        if (copyResponse.ok) {
+          const copyData = await copyResponse.json();
+          const toolCall = copyData.choices?.[0]?.message?.tool_calls?.[0];
+          if (toolCall?.function?.arguments) {
+            adCopy = JSON.parse(toolCall.function.arguments);
+          }
+        }
+      } catch (e) {
+        console.error("Ad copy generation failed (non-blocking):", e);
+      }
+    }
+
+    return new Response(JSON.stringify({ imageUrl, adCopy }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (error) {
     console.error("generate-creative error:", error);

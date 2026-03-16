@@ -5,3 +5,5 @@ project_id = "tfbttrvqfdtmuhmmwksj"
     verify_jwt = false
   [functions.generate-creative]
     verify_jwt = false
+  [functions.scrape-product]
+    verify_jwt = false

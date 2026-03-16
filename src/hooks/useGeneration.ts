@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { GenerationTask, GeneratedImage, GenerationSettings, StyleCategory, PredefinedJsonPrompt } from '@/types';
+import { GenerationTask, GeneratedImage, GenerationSettings, StyleCategory, PredefinedJsonPrompt, AdCopy, ScrapedProduct } from '@/types';
 import { compilePrompt, getStyleTag } from '@/lib/promptCompiler';
 import { useToast } from '@/hooks/use-toast';
 
@@ -13,6 +13,8 @@ export interface GenerateInput {
   modelImages: string[];
   clientId?: string;
   jsonPrompt?: PredefinedJsonPrompt | null;
+  influencePrompt?: string;
+  scrapedProduct?: ScrapedProduct | null;
   onComplete?: (results: GeneratedImage[]) => void;
 }
 
@@ -32,7 +34,10 @@ export function useGeneration() {
       hasModelImage: input.modelImages.length > 0,
       aspectRatio: input.settings.aspectRatio,
       cameraLens: input.settings.cameraLens,
+      cameraAngle: input.settings.cameraAngle,
       jsonPrompt: input.jsonPrompt || null,
+      influencePrompt: input.influencePrompt,
+      scrapedUsps: input.scrapedProduct?.usps,
     });
 
     const styleTag = getStyleTag(input.style, input.styleSubOptions);
@@ -44,6 +49,13 @@ export function useGeneration() {
       contentParts.push({ type: 'image_url', image_url: { url: img } });
     }
     const messages = [{ role: 'user', content: contentParts }];
+
+    // Build ad copy context if scraped data exists
+    const adCopyContext = input.scrapedProduct ? {
+      product_name: input.scrapedProduct.product_name,
+      description: input.scrapedProduct.description,
+      usps: input.scrapedProduct.usps,
+    } : undefined;
 
     const newTask: GenerationTask = {
       id: taskId,
@@ -67,7 +79,7 @@ export function useGeneration() {
     try {
       const promises = Array.from({ length: input.settings.numOutputs }, (_, i) =>
         supabase.functions.invoke('generate-creative', {
-          body: { messages, aspectRatio: input.settings.aspectRatio },
+          body: { messages, aspectRatio: input.settings.aspectRatio, adCopyContext },
         }).then(({ data, error }) => {
           if (error) throw error;
           if (data?.imageUrl) {
@@ -79,6 +91,7 @@ export function useGeneration() {
               created_at: new Date().toISOString(),
               aspect_ratio: input.settings.aspectRatio,
               style_tag: styleTag,
+              ad_copy: data.adCopy || null,
             };
             results.push(img);
             setTask((prev) => prev ? { ...prev, progress: (results.length / input.settings.numOutputs) * 100, results: [...results] } : prev);
